@@ -40,15 +40,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdint.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-
-#include "esp_log.h"
-#include "esp_system.h"
-#include "esp_err.h"
 
 #include "at24c32.h"
 #include "ds3231.h"
@@ -62,10 +53,12 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define EEPROM_SETTINGS_ADDR	0x0	// direccion en la eeprom donde se guarda los device settings
+#define EEPROM_SETTINGS_ADDR	0x0		// direccion en la eeprom donde se guarda los device settings
 #define EEPROM_USER_ID_ADDR		0x10	// direccion en la eeprom donde se guarda el user ID
 #define EEPROM_INDEX_ADDR		0x20	// dirección en la eeprom donde se guarda la fecha
-#define EEPROM_BASE_INDEX_ADDR	0x30		// dirección en la eeprom donde se guarda el conteo de pulsos
+#define	EEPROM_QTY_DAYS			0x22	// dirección en la eeprom donde se guarda la cantidad de dias monitoreados
+#define EEPROM_BASE_INDEX_ADDR	0x30	// dirección en la eeprom donde se guarda el conteo de pulsos
+#define DATA_SIZE				5		// tamaño en Bytes de los datos guardados en la EEPROM
 
 
 
@@ -73,35 +66,27 @@ extern "C" {
 
 typedef struct
 {
-	Ds3231Date_t xDate;
 	uint16_t usCount;
 	uint32_t ulID;
 	uint16_t usIndex;
+	uint16_t usDaysCount;
+	ds3231_t xRtc;
 } DataLogger_t;
 
 /*==================[external data declaration]==============================*/
 
-//extern vPulseCountInit();
-
 /*==================[external functions declaration]=========================*/
 
-extern uint16_t usDataLoggerGetIndex( void );
-extern uint16_t usDataLoggerGetCount( uint16_t usAddress );
-//extern uint32_t ulDataLoggerGetID( void );
-extern void vDataLoggerSetIndex( uint16_t usIndex );
-extern void vDataLoggerSetCount( uint16_t usAdress, uint16_t usCount );
-//extern void vDataLoggerSetID( uint32_t ulID );
-extern void vDataLoggerInit( DataLogger_t *xData );
-/*
-extern uint16_t usDataLoggerGetRandomCount( uint16_t usAddress );*
-extern uint16_t usDataLoggerGetCurrentCount( void );*
-extern uint16_t usDataLoggerGetCountIndex( void );*
-extern uint16_t usDataLoggerGetDateIndex( void );*
-
-extern void vDataLoggerSetCurrentCount( uint16_t usCount, DataLogger_t *xData );*
-extern void vDataLoggerSetCurrentCountIndex( uint16_t usCountIndex );*
-extern void vDataLoggerSetDateIndex( uint16_t usDateIndex );*
-*/
+uint16_t usDataLoggerGetIndex( void );
+uint16_t usDataLoggerGetCount( uint16_t usAddress );
+uint16_t usDataLoggerGetDaysCount( void );
+uint32_t ulDataLoggerGetID( void );
+void vDataLoggerSetIndex( uint16_t usIndex );
+void vDataLoggerSetCount( uint16_t usAdress, uint16_t usCount );
+void vDataLoggerSetDaysCount( uint16_t usDaysCount );
+void vDataLoggerSetID( uint32_t ulID );
+void vDataLoggerSetCurrentDate( void );
+void vDataLoggerInit( DataLogger_t *xData );
 
 /*==================[cplusplus]==============================================*/
 

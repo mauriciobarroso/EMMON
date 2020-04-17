@@ -51,7 +51,7 @@ static const hd44780_font_t lcd_font = HD44780_FONT_5X8;
 
 /*==================[internal functions declaration]=========================*/
 
-static esp_err_t i2c_init();
+//static esp_err_t i2c_init();
 static esp_err_t pcf8574_write( i2c_port_t i2c_num, uint8_t data );
 static void hd44780_write_nibble( uint8_t byte, bool rs, bool bl );
 static void hd44780_write_byte( uint8_t byte, bool rs, bool bl );
@@ -61,7 +61,7 @@ static void hd44780_write_byte( uint8_t byte, bool rs, bool bl );
 extern void lcd_init( void )
 {
 	// i2c initialization
-	i2c_init();
+	//i2c_init();
 
     // switch to 4 bit mode
     for ( uint8_t i = 0; i < 3; i ++ )
@@ -127,7 +127,7 @@ extern void lcd_puts( const char * string )
 
 /*==================[internal functions definition]=========================*/
 
-static esp_err_t i2c_init()
+/*static esp_err_t i2c_init()
 {
     int i2c_master_port = I2C_MASTER_NUM;
     i2c_config_t conf;
@@ -143,7 +143,7 @@ static esp_err_t i2c_init()
     ESP_ERROR_CHECK( i2c_param_config( i2c_master_port, &conf ));
 
     return ESP_OK;
-}
+}*/
 
 static esp_err_t pcf8574_write( i2c_port_t i2c_num, uint8_t data )
 {

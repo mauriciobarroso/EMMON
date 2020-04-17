@@ -38,6 +38,7 @@
 
 /*==================[inclusions]=============================================*/
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
 #include "driver/i2c.h"
@@ -50,8 +51,8 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 #ifndef I2C_MASTER_SCL_IO
-#define I2C_MASTER_SCL_IO						4					/* gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO						5					/* gpio number for I2C master data  */
+#define I2C_MASTER_SCL_IO						2					/* gpio number for I2C master clock */
+#define I2C_MASTER_SDA_IO						0					/* gpio number for I2C master data  */
 #define I2C_MASTER_NUM             			 	I2C_NUM_0			/* I2C port number for master dev */
 #define I2C_MASTER_TX_BUF_DISABLE  			 	0					/* I2C master do not need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE   			0					/* I2C master do not need buffer */
@@ -83,7 +84,7 @@ extern "C" {
 #define DS3231_ALARM2_HOURS_ADDR				0xC					/*!< Alarm 2 Hours register address of DS3231 RTC */
 #define DS3231_ALARM2_DAYDATE_ADDR				0xD					/*!< Alarm 2 Day/Date register address of DS3231 RTC */
 #define DS3231_CONTROL_ADDR						0xE					/*!< Control register address of DS3231 RTC */
-#define DS3231_CONTROLSTATUS_ADDR				0xF					/*!< Control/Status register address of DS3231 RTC */
+#define DS3231_CONTROL_STATUS_ADDR				0xF					/*!< Control/Status register address of DS3231 RTC */
 #define DS3231_AGING_OFFSET_ADDR				0x10				/*!< Aging Offfset register address of DS3231 RTC */
 #define DS3231_MSB_TEMP_ADDR					0x11				/*!< MSB of Temp register address of DS3231 RTC */
 #define DS3231_LSB_TEMP_ADDR					0x12				/*!< LSB of Temp register address of DS3231 RTC */
@@ -96,7 +97,7 @@ typedef enum
 	OUTPUT_1024KHZ = 0x48,	/*!< set SQW/OUT output to 1024KHz */
 	OUTPUT_4096KHZ = 0x50,	/*!< set SQW/OUT output to 4096KHz */
 	OUTPUT_8192KHZ = 0x58,	/*!< set SQW/OUT output to 8192KHz */
-} eDs3231SqwOut_t;
+} ds3231_sqw_out_frequency_t;
 
 /* Alarm Interrupt Status */
 typedef enum
@@ -105,7 +106,7 @@ typedef enum
 	ENABLE_ALARM1 = 0x5,	/*!< enable interrupt of alarm 1 */
 	ENABLE_ALARM2 = 0x6,	/*!< enable interrupt of alarm 2 */
 	ENABLE_ALL = 0x07,		/*!< enable interrupt of alarm 1 and alarm 2 */
-} eDs3231AlarmInterrupMode_t;
+} ds3231_alarm_interrupt_mode_t;
 
 /* Alarm Mask Bits */
 typedef enum
@@ -117,7 +118,7 @@ typedef enum
 	DATE_HOURS_MINUTES_SECONDS_MATCH = 0x0,	/*!< set alarm 1 when date, hours, minutes and seconds match */
 	DAY_HOURS_MINUTES_SECONDS_MATCH = 0x10,	/*!< set alarm 1 when day, hours, minutes and seconds match */
 
-} eDs3231Alarm1Mode_t;
+} ds3231_alarm1_mode_t;
 
 typedef enum
 {
@@ -126,7 +127,7 @@ typedef enum
 	HOURS_MINUTES_MATCH = 0x4,		/*!< set alarm 2 when hours and minutes match */
 	DATE_HOURS_MINUTES_MATCH = 0x0,	/*!< set alarm 2 when date, hours and minutes */
 	DAY_HOURS_MINUTES_MATCH = 0x8,	/*!< set alarm 2 when day, hours and minutes */
-} eDs3231Alarm2Mode_t;
+} ds3231_alarm2_mode_t;
 
 /*  */
 
@@ -139,66 +140,69 @@ typedef enum
 	THURSDAY = 5,
 	FRIDAY = 6,
 	SATURDAY = 7,
-} eDs3231Dow_t;
+} ds3231_day_t;
 
 typedef struct
 {
-	uint8_t ucSeconds;	/*!< seconds of RTC*/
-	uint8_t ucMinutes;	/*!< minutes of RTC */
-	uint8_t ucHours;	/*!< hours of RTC */
-} Ds3231Time_t;
+	uint8_t seconds;	/*!< seconds of RTC*/
+	uint8_t minutes;	/*!< minutes of RTC */
+	uint8_t hours;		/*!< hours of RTC */
+} ds3231_time_t;
 
 typedef struct
 {
-	eDs3231Dow_t ucDay;	/*!< day of RTC */
-	uint8_t ucDate;		/*!< date of RTC */
-	uint8_t ucMonth;	/*!< month of RTC */
-	uint8_t ucYear;		/*!< year of RTC */
-} Ds3231Date_t;
+	ds3231_day_t day;	/*!< day of RTC */
+	uint8_t date;		/*!< date of RTC */
+	uint8_t month;		/*!< month of RTC */
+	uint8_t year;		/*!< year of RTC */
+} ds3231_date_t;
 
 typedef struct
 {
-	//eDs3231Alarm1Mode_t xAlarmMode;	/*!< mode of alarm 1 */
-	uint8_t ucSeconds;				/*!< seconds of alarm 1 */
-	uint8_t ucMinutes;				/*!< minutes of alarm 1 */
-	uint8_t ucHours;				/*!< horus of alarm 1 */
-	uint8_t ucDayDate;				/*!< day or date of alarm 1 */
-} Ds3231Alarm1_t;
+	uint8_t seconds;			/*!< seconds of alarm 1 */
+	uint8_t minutes;			/*!< minutes of alarm 1 */
+	uint8_t hours;				/*!< horus of alarm 1 */
+	uint8_t daydate;			/*!< day or date of alarm 1 */
+	ds3231_alarm1_mode_t mode;	/*!< mode of alarm 1 */
+} ds3231_alarm1_t;
 
 typedef struct
 {
-	//eDs3231Alarm2Mode_t xAlarmMode;	/*!< mode of alarm 2 */
-	uint8_t ucMinutes;				/*!< minutes of alarm 2 */
-	uint8_t ucHours;					/*!< hours of alarm 2 */
-	uint8_t ucDayDate;					/*!< day or date of alarm 2 */
-} Ds3231Alarm2_t;
+	uint8_t minutes;			/*!< minutes of alarm 2 */
+	uint8_t hours;				/*!< hours of alarm 2 */
+	uint8_t daydate;			/*!< day or date of alarm 2 */
+	ds3231_alarm2_mode_t mode;	/*!< mode of alarm 2 */
+} ds3231_alarm2_t;
 
 typedef struct
 {
-	Ds3231Time_t xTime;
-	Ds3231Date_t xDate;
-	Ds3231Alarm1_t xAlarm1;
-	Ds3231Alarm2_t xAlarm2;
-	//eDs3231SqwOut_t xSqwOut;
-	//eDs3231AlarmInterrupMode_t xAlarmInterruptMode;
-} Ds3231_t;
+	ds3231_time_t time;
+	ds3231_date_t date;
+	ds3231_alarm1_t alarm1;
+	ds3231_alarm2_t alarm2;
+	ds3231_sqw_out_frequency_t sqw_out;
+	ds3231_alarm_interrupt_mode_t alarm_interrupt_mode;
+} ds3231_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-extern esp_err_t xDs3231Init( Ds3231_t *xDs3231Config );
-extern esp_err_t xDs3231GetTime( Ds3231_t *xDs3231Config );
-extern esp_err_t xDs3231GetDate( Ds3231_t *xDs3231Config );
-extern esp_err_t xDs3231SetTime( Ds3231_t *xDs3231Config );
-extern esp_err_t xDs3231SetDate( Ds3231_t *xDs3231Config );
-/*extern esp_err_t ds3231_get_alarm1( Ds3231_t *xDs3231Config );
-extern esp_err_t ds3231_get_alarm2( Ds3231_t *xDs3231Config );
-extern esp_err_t ds3231_set_alarm1( Ds3231_t *xDs3231Config );
-extern esp_err_t ds3231_set_alarm2( Ds3231_t *xDs3231Config );
-extern esp_err_t ds3231_set_alarm_interrupt( Ds3231_t *xDs3231Config );
-extern esp_err_t ds3231_set_sqw_output( Ds3231_t *xDs3231Config );*/
-
+extern esp_err_t ds3231_init( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_get_time( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_get_date( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_set_time( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_set_date( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_get_alarm1( ds3231_t *ds3231_data );
+//extern esp_err_t ds3231_get_alarm2( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_set_alarm1( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_set_alarm2( ds3231_t *ds3231_data );
+extern esp_err_t ds3231_set_alarm_interrupt( ds3231_t *ds3231_data );
+//extern esp_err_t ds3231_set_sqw_output( Ds3231_t *xDs3231Config );
+void get_control( uint8_t *data );
+void get_control_status( uint8_t *data );
+bool get_alarm1_flag( void );
+void clear_alarm1_flag( void );
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus

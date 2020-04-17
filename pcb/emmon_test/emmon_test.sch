@@ -1,0 +1,170 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Connector:Conn_01x15_Female J3
+U 1 1 5E9288A3
+P 5550 2450
+F 0 "J3" H 5578 2476 50  0000 L CNN
+F 1 "Conn_01x15_Female" H 5578 2385 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x15_P2.54mm_Vertical" H 5550 2450 50  0001 C CNN
+F 3 "~" H 5550 2450 50  0001 C CNN
+	1    5550 2450
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x15_Female J4
+U 1 1 5E933EE6
+P 6450 2450
+F 0 "J4" H 6478 2476 50  0000 L CNN
+F 1 "Conn_01x15_Female" H 6478 2385 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x15_P2.54mm_Vertical" H 6450 2450 50  0001 C CNN
+F 3 "~" H 6450 2450 50  0001 C CNN
+	1    6450 2450
+	-1   0    0    1   
+$EndComp
+$Comp
+L power:GND #PWR01
+U 1 1 5E967960
+P 7600 2400
+F 0 "#PWR01" H 7600 2150 50  0001 C CNN
+F 1 "GND" H 7605 2227 50  0000 C CNN
+F 2 "" H 7600 2400 50  0001 C CNN
+F 3 "" H 7600 2400 50  0001 C CNN
+	1    7600 2400
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR02
+U 1 1 5E968AB6
+P 7950 2400
+F 0 "#PWR02" H 7950 2150 50  0001 C CNN
+F 1 "GND" H 7955 2227 50  0000 C CNN
+F 2 "" H 7950 2400 50  0001 C CNN
+F 3 "" H 7950 2400 50  0001 C CNN
+	1    7950 2400
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR03
+U 1 1 5E9690A7
+P 8300 2400
+F 0 "#PWR03" H 8300 2150 50  0001 C CNN
+F 1 "GND" H 8305 2227 50  0000 C CNN
+F 2 "" H 8300 2400 50  0001 C CNN
+F 3 "" H 8300 2400 50  0001 C CNN
+	1    8300 2400
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R_Small R2
+U 1 1 5E966DA2
+P 7950 1900
+F 0 "R2" H 8009 1946 50  0000 L CNN
+F 1 "R_Small" H 8009 1855 50  0000 L CNN
+F 2 "Resistor_SMD:R_0805_2012Metric" H 7950 1900 50  0001 C CNN
+F 3 "~" H 7950 1900 50  0001 C CNN
+	1    7950 1900
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R_Small R1
+U 1 1 5E9633F0
+P 7600 1900
+F 0 "R1" H 7659 1946 50  0000 L CNN
+F 1 "R_Small" H 7659 1855 50  0000 L CNN
+F 2 "Resistor_SMD:R_0805_2012Metric" H 7600 1900 50  0001 C CNN
+F 3 "~" H 7600 1900 50  0001 C CNN
+	1    7600 1900
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:LED D3
+U 1 1 5E960714
+P 8300 2200
+F 0 "D3" V 8339 2083 50  0000 R CNN
+F 1 "LED" V 8248 2083 50  0000 R CNN
+F 2 "LED_THT:LED_D3.0mm" H 8300 2200 50  0001 C CNN
+F 3 "~" H 8300 2200 50  0001 C CNN
+	1    8300 2200
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Device:LED D2
+U 1 1 5E960468
+P 7950 2200
+F 0 "D2" V 7989 2083 50  0000 R CNN
+F 1 "LED" V 7898 2083 50  0000 R CNN
+F 2 "LED_THT:LED_D3.0mm" H 7950 2200 50  0001 C CNN
+F 3 "~" H 7950 2200 50  0001 C CNN
+	1    7950 2200
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Device:LED D1
+U 1 1 5E95D7AB
+P 7600 2200
+F 0 "D1" V 7639 2083 50  0000 R CNN
+F 1 "LED" V 7548 2083 50  0000 R CNN
+F 2 "LED_THT:LED_D3.0mm" H 7600 2200 50  0001 C CNN
+F 3 "~" H 7600 2200 50  0001 C CNN
+	1    7600 2200
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Connector:Conn_01x08_Female J2
+U 1 1 5E9478F3
+P 5400 4650
+F 0 "J2" H 5428 4626 50  0000 L CNN
+F 1 "Conn_01x08_Female" H 5428 4535 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical" H 5400 4650 50  0001 C CNN
+F 3 "~" H 5400 4650 50  0001 C CNN
+	1    5400 4650
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x06_Female J1
+U 1 1 5E927623
+P 5400 3900
+F 0 "J1" H 5428 3876 50  0000 L CNN
+F 1 "Conn_01x06_Female" H 5428 3785 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x06_P2.54mm_Vertical" H 5400 3900 50  0001 C CNN
+F 3 "~" H 5400 3900 50  0001 C CNN
+	1    5400 3900
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x04_Female J5
+U 1 1 5E936650
+P 6650 3800
+F 0 "J5" H 6678 3776 50  0000 L CNN
+F 1 "Conn_01x04_Female" H 6678 3685 50  0000 L CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical" H 6650 3800 50  0001 C CNN
+F 3 "~" H 6650 3800 50  0001 C CNN
+	1    6650 3800
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R_Small R3
+U 1 1 5E96705D
+P 8300 1900
+F 0 "R3" H 8359 1946 50  0000 L CNN
+F 1 "R_Small" H 8359 1855 50  0000 L CNN
+F 2 "Resistor_SMD:R_0805_2012Metric" H 8300 1900 50  0001 C CNN
+F 3 "~" H 8300 1900 50  0001 C CNN
+	1    8300 1900
+	1    0    0    -1  
+$EndComp
+$EndSCHEMATC

@@ -1,4 +1,4 @@
-update=lun 16 dic 2019 00:29:15 -03
+update=sáb 11 abr 2020 18:00:54 -03
 version=1
 last_client=kicad
 [general]
@@ -25,7 +25,7 @@ ERC_TestSimilarLabels=1
 [pcbnew]
 version=1
 PageLayoutDescrFile=
-LastNetListRead=test_prototype.net
+LastNetListRead=emmon_test.net
 CopperLayerCount=2
 BoardThickness=1.6
 AllowMicroVias=0

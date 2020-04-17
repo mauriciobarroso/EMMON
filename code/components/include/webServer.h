@@ -1,4 +1,4 @@
-/* Copyright 2019, Mauricio Barroso
+/* Copyright 2020, Mauricio Barroso
  * All rights reserved.
  *
  * This file is part of EMMON.
@@ -33,16 +33,33 @@
 
 /* Date: 10/12/19 */
 
-#ifndef _AT24C32_H_
-#define _AT24C32_H_
+#ifndef _WEBSERVER_H_
+#define _WEBSERVER_H_
 
 /*==================[inclusions]=============================================*/
 
-#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
 #include "freertos/FreeRTOS.h"
-#include "driver/i2c.h"
-#include "esp_err.h"
-#include "rom/ets_sys.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+
+#include "esp_system.h"
+#include "esp_log.h"
+
+#include "esp_netif.h"
+#include "esp_event.h"
+#include "esp_wifi.h"
+#include "nvs.h"
+#include "nvs_flash.h"
+
+#include "lwip/err.h"
+#include "lwip/sys.h"
+#include "esp_http_server.h"
+
+#include "esp_spiffs.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -51,29 +68,18 @@ extern "C" {
 #endif
 
 /*==================[macros]=================================================*/
-#ifndef I2C_MASTER_SCL_IO
-#define I2C_MASTER_SCL_IO			2                /* gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO           0               /* gpio number for I2C master data  */
-#define I2C_MASTER_NUM              I2C_NUM_0        /* I2C port number for master dev */
-#define I2C_MASTER_TX_BUF_DISABLE   0                /* I2C master do not need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0                /* I2C master do not need buffer */
-#endif
 
-#ifndef WRITE_BIT
-#define WRITE_BIT                   I2C_MASTER_WRITE /* I2C master write */
-#define READ_BIT                    I2C_MASTER_READ  /* I2C master read */
-#define ACK_CHECK_EN                0x1              /* I2C master will check ack from slave*/
-#define ACK_CHECK_DIS               0x0              /* I2C master will not check ack from slave */
-#define ACK_VAL                     0x0              /* I2C ack value */
-#define NACK_VAL                    0x1              /* I2C nack value */
-#define LAST_NACK_VAL               0x2              /* I2C last_nack value */
-#endif
+#define STA_WIFI_SSID		"CASAwifi"
+#define STA_WIFI_PASS		"orcobebe"
 
-#define AT24C32_ADDR				0x57             /* slave address for AT24C32 EEPROM */
+#define AP_WIFI_SSID		"EMMON"
+#define AP_WIFI_PASS	"123456789"
+#define AP_MAX_STA_CONN		10
 
-#define MS							1000
-#define DELAY			  			( 5 * MS ) // >1.53ms according to datasheet
-#define write_cycle_delay()			do { ets_delay_us( DELAY ); } while ( 0 )
+#define ESP_MAX_RETRY		3
+
+#define WIFI_CONNECTED_BIT	BIT0
+#define WIFI_FAIL_BIT      	BIT1
 
 /*==================[typedef]================================================*/
 
@@ -81,11 +87,17 @@ extern "C" {
 
 /*==================[external functions declaration]=========================*/
 
-extern esp_err_t i2c_init( void );
-extern esp_err_t at24c32_write( uint16_t reg_address, uint8_t * data );
-extern esp_err_t at24c32_page_write( uint16_t reg_address, uint8_t * data, size_t data_len );
-extern esp_err_t at24c32_read( uint16_t reg_address, uint8_t * data );
-//extern esp_err_t at24c32_sequential_read( i2c_port_t i2c_num, uint16_t reg_address, uint8_t * data, size_t data_len );
+esp_err_t hello_get_handler(httpd_req_t *req);
+httpd_handle_t start_webserver(void);
+void stop_webserver(httpd_handle_t server);
+static void disconnect_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+static void connect_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+
+/* sta wifi */
+static void event_handler( void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+void vWifiInit( void );
+void vWebServerInit( void );
 
 /*==================[cplusplus]==============================================*/
 
@@ -96,4 +108,4 @@ extern esp_err_t at24c32_read( uint16_t reg_address, uint8_t * data );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _AT24C32_H_ */
+#endif /* #ifndef _WEBSERVER_H_ */

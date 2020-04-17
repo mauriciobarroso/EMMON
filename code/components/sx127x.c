@@ -273,7 +273,7 @@ extern void lora_send_packet( uint8_t *buf, int size ) /* uin8_t o uint32_t? */
 	sx127x_write_reg( SX127X_REG_OP_MODE, LONG_RANGE_MODE | TX );
 
 	while( ( sx127x_read_reg( SX127X_REG_IRQ_FLAGS ) & TX_DONE_MASK ) == 0 )
-		vTaskDelay( 2 );
+		vTaskDelay( 2 ); // verificar
 
 	sx127x_write_reg( SX127X_REG_IRQ_FLAGS, TX_DONE_MASK );
 }

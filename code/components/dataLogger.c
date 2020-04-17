@@ -52,72 +52,22 @@ static void vEepromSetValue( uint16_t usAddress, uint16_t usValue );
 
 /*==================[external functions definition]=========================*/
 
-extern uint16_t usDataLoggerGetIndex( void )
+uint16_t usDataLoggerGetIndex( void )
 {
 	return usEepromGetValue( EEPROM_INDEX_ADDR );
 }
 
-extern uint16_t usDataLoggerGetCount( uint16_t usAddress )
+uint16_t usDataLoggerGetCount( uint16_t usAddress )
 {
 	return usEepromGetValue( usAddress );
 }
 
-//extern uint32_t ulDataLoggerGetID( void )
-
-extern void vDataLoggerSetIndex( uint16_t usIndex )
+uint16_t usDataLoggerGetDaysCount( void )
 {
-	vEepromSetValue( EEPROM_INDEX_ADDR, usIndex );
+	return usEepromGetValue( EEPROM_QTY_DAYS );
 }
 
-extern void vDataLoggerSetCount( uint16_t usAdress, uint16_t usCount )
-{
-	vEepromSetValue( usAdress, usCount );
-}
-
-//extern void vDataLoggerSetID( uint32_t ulID );
-
-extern void vDataLoggerInit( DataLogger_t *xData )
-{
-	i2c_init();
-	//vDataLoggerSetIndex( EEPROM_BASE_INDEX_ADDR );
-
-	xData->usIndex = usDataLoggerGetIndex();
-	//if( xData->usCountIndex == 0xFFFF )
-		//vDataLoggerSetCurrentCountIndex( xData->usCountIndex );
-
-	xData->usCount = usDataLoggerGetCount( xData->usIndex );
-	//if( xData->usCount == 0xFFFF )
-		//xData->usCount = 0;
-}
-
-/*
-extern uint16_t usDataLoggerGetRandomCount( uint16_t usAddress )
-{
-	return usEepromGetValue( usAddress );
-}
-
-extern uint16_t usDataLoggerGetCurrentCount( void )
-{
-	return usEepromGetValue( usEepromGetValue( EEPROM_CURRENT_INDEX_ADDR ) );
-}
-
-extern uint16_t usDataLoggerGetCountIndex( void )
-{
-	return usEepromGetValue( EEPROM_CURRENT_INDEX_ADDR );
-}
-
-extern uint16_t usDataLoggerGetDateIndex( void )
-{
-	uint16_t usDateIndex;
-	uint16_t usCountIndex;
-
-	usCountIndex = usDataLoggerGetCountIndex();
-	usDateIndex = EEPROM_DATE_ADDR + usCountIndex + ( usCountIndex / 2 );
-
-	return usDateIndex;
-}
-
-extern uint32_t ulDataLoggerGetID( void )
+uint32_t ulDataLoggerGetID( void )
 {
 	uint32_t ulID;
 	uint8_t ucID[ 4 ];
@@ -135,12 +85,22 @@ extern uint32_t ulDataLoggerGetID( void )
 	return ulID;
 }
 
-extern void vDataLoggerSetCurrentCount( uint16_t usCount, DataLogger_t *xData )
+void vDataLoggerSetIndex( uint16_t usIndex )
 {
-	vEepromSetValue( xData->usCountIndex, usCount );
+	vEepromSetValue( EEPROM_INDEX_ADDR, usIndex );
 }
 
-extern void vDataLoggerSetID( uint32_t ulID )
+void vDataLoggerSetCount( uint16_t usAdress, uint16_t usCount )
+{
+	vEepromSetValue( usAdress, usCount );
+}
+
+void vDataLoggerSetDaysCount( uint16_t usDaysCount )
+{
+	vEepromSetValue( EEPROM_QTY_DAYS, usDaysCount );
+}
+
+void vDataLoggerSetID( uint32_t ulID )
 {
 	uint8_t ucID[ sizeof( ulID ) ];
 
@@ -155,36 +115,57 @@ extern void vDataLoggerSetID( uint32_t ulID )
 	at24c32_write( EEPROM_USER_ID_ADDR + 3, &ucID[ 3 ] );
 }
 
-extern void vDataLoggerSetCurrentCountIndex( uint16_t usCountIndex )
+void vDataLoggerSetCurrentDate( void )
 {
-	vEepromSetValue( EEPROM_CURRENT_INDEX_ADDR, usCountIndex );
+	ds3231_t xRTC;
+	uint16_t usCurrentIndex;
+
+	usCurrentIndex = usDataLoggerGetIndex();
+	ds3231_get_date( &xRTC );
+
+	at24c32_write( usCurrentIndex + 2, &xRTC.date.date );
+	at24c32_write( usCurrentIndex + 3, &xRTC.date.month );
+	at24c32_write( usCurrentIndex + 4, &xRTC.date.year );
 }
 
-extern void vDataLoggerSetDateIndex( uint16_t usDateIndex )
+void vDataLoggerInit( DataLogger_t *xData )
 {
-	vEepromSetValue( usDataLoggerGetDateIndex(), usDateIndex );
-}
+	/* inicilaización de I2C */
+	i2c_init();
 
-extern void vDataLoggerInit( DataLogger_t *xData )
-{
-	xMutex = xSemaphoreCreateMutex();
+	/* inicialización de la variable para el índice de conteo de pulsos */
+	xData->usIndex = usDataLoggerGetIndex();
+	if( xData->usIndex < EEPROM_BASE_INDEX_ADDR || xData->usIndex == 0xFFFF )
+		vDataLoggerSetIndex( EEPROM_BASE_INDEX_ADDR );
 
-	//vDataLoggerSetCurrentCountIndex( EEPROM_PULSE_COUNT_ADDR );
+	/* inicialización de la variable para el conteo de pulsos */
+	xData->usCount = usDataLoggerGetCount( xData->usIndex );
+	if( xData->usCount == 0xFFFF )
+		xData->usCount = 0;
 
-	xData->usCountIndex = usDataLoggerGetCountIndex();
-	//if( xData->usCountIndex == 0xFFFF )
-		//vDataLoggerSetCurrentCountIndex( xData->usCountIndex );
+	/* inicialización de la variable para el conteo de días monitoreados */
+	xData->usDaysCount = usDataLoggerGetDaysCount();
+	if( xData->usDaysCount == 0xFF )
+		xData->usDaysCount = 0;
 
-	xData->usCount = usDataLoggerGetCurrentCount();
-	//if( xData->usCount == 0xFFFF )
-		//xData->usCount = 0;
-
-	xData->usDateIndex = usDataLoggerGetDateIndex();
-
-	vDataLoggerSetID( 65535 );
+	/* inicialización de la variable para el ID del usuario */
 	xData->ulID = ulDataLoggerGetID();
+	if( xData->ulID == 0xFFFFFFFF )
+		xData->ulID = 0x12345678;
+
+	/* configuración de la alarma 1 del RTC */
+	xData->xRtc.alarm1.seconds = 0x0;
+	xData->xRtc.alarm1.minutes = 0x17;
+	xData->xRtc.alarm1.hours = 0x0;
+	xData->xRtc.alarm1.daydate = 0x0;
+	xData->xRtc.alarm1.mode = MINUTES_SECONDS_MATCH;
+	ds3231_set_alarm1( &xData->xRtc );
+
+	/* habilitación de la interrupción por alarma del RTC */
+	xData->xRtc.alarm_interrupt_mode = ENABLE_ALARM1;
+	ds3231_set_alarm_interrupt( &xData->xRtc );
 }
-*/
+
 /*==================[internal functions definition]==========================*/
 
 

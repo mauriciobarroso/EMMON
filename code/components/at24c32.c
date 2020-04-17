@@ -74,8 +74,8 @@ extern esp_err_t at24c32_write( uint16_t reg_address, uint8_t * data )
 
     i2c_master_start( cmd ); // start condition
     i2c_master_write_byte( cmd, AT24C32_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN ); // device address
-    i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // first word address
-    i2c_master_write_byte( cmd, ( uint8_t )( ( reg_address & 0xFF00 ) >> 8 ), ACK_CHECK_EN ); // second word address
+    i2c_master_write_byte( cmd, ( uint8_t )( ( reg_address & 0xFF00 ) >> 8 ), ACK_CHECK_EN ); // first word address
+    i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // second word address
    	i2c_master_write( cmd, data, 1, ACK_CHECK_EN );
    	i2c_master_stop( cmd ); // stop condition
     ret = i2c_master_cmd_begin( I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS );
@@ -92,8 +92,8 @@ extern esp_err_t at24c32_page_write( uint16_t reg_address, uint8_t * data, size_
 
     i2c_master_start( cmd ); // start condition
     i2c_master_write_byte( cmd, AT24C32_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN ); // device address
-    i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // first word address
-    i2c_master_write_byte( cmd, ( uint8_t )( ( reg_address & 0xFF00 ) >> 8 ), ACK_CHECK_EN ); // second word address
+    i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // second word address
+    i2c_master_write_byte( cmd, ( uint8_t )( ( reg_address & 0xFF00 ) >> 8 ), ACK_CHECK_EN ); // first word address
    	i2c_master_write( cmd, data, data_len, ACK_CHECK_EN );
    	i2c_master_stop( cmd ); // stop condition
     ret = i2c_master_cmd_begin( I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS );
@@ -112,15 +112,22 @@ extern esp_err_t at24c32_read( uint16_t reg_address, uint8_t * data )
 
     i2c_master_start(cmd);
     i2c_master_write_byte( cmd, AT24C32_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN ); // device address
-	i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // first word address
 	i2c_master_write_byte( cmd, ( uint8_t )( ( reg_address & 0xFF00 ) >> 8 ), ACK_CHECK_EN ); // second word address
+	i2c_master_write_byte( cmd, ( uint8_t )( reg_address & 0x00FF ), ACK_CHECK_EN ); // first word address
+    i2c_master_stop(cmd);
+    ret = i2c_master_cmd_begin( I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS);
+    i2c_cmd_link_delete(cmd);
+
+    if( ret != ESP_OK )
+    	return ret;
+
+    cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte( cmd, AT24C32_ADDR << 1 | READ_BIT, ACK_CHECK_EN ); // device address
     i2c_master_read(cmd, data, 1, LAST_NACK_VAL);
     i2c_master_stop(cmd);
     ret = i2c_master_cmd_begin( I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
-    //write_cycle_delay();
 
     return ret;
 }
