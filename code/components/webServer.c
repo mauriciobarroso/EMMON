@@ -1,37 +1,9 @@
-/* Copyright 2020, Mauricio Barroso
- * All rights reserved.
+/*
+ * web_interface.c
  *
- * This file is part of arquitecturaDeMicroprocesadores.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
+ * Created on: Nov 1, 2019
+ * Author: Mauricio Barroso
  */
-
-/* Date: 11/02/20 */
 
 /*==================[inlcusions]============================================*/
 
@@ -39,216 +11,446 @@
 
 /*==================[macros]=================================================*/
 
+/* Max length a file path can have on storage */
+#define FILE_PATH_MAX 					( ESP_VFS_PATH_MAX + CONFIG_SPIFFS_OBJ_NAME_LEN )
+
+#define SCRATCH_BUFSIZE					8192
+
+#define IS_FILE_EXT( filename, ext )	( strcasecmp( &filename[ strlen( filename ) - sizeof( ext ) + 1 ], ext ) == 0 )
+
 /*==================[typedef]================================================*/
+
+	char base_path[ ESP_VFS_PATH_MAX + 1 ];	/**< base path of tile storage */
+	char scratch[ SCRATCH_BUFSIZE ];		/**< scratch buffer for temporary storage during file transfer */
 
 /*==================[internal data declaration]==============================*/
 
-static EventGroupHandle_t xWifiEventGroup;
+static EventGroupHandle_t wifi_event_group;
 
 /* others */
 static int s_retry_num = 0;
 
-/**/
-static httpd_handle_t server = NULL;
+static const char *TAG = "webServer";
 
 /*==================[external data declaration]==============================*/
 
-static const char *TAG = "webServer";
-
 /*==================[internal functions declaration]=========================*/
+
+static esp_err_t spiffs_init( void );
+static void wifi_event_handler( void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data );
+static void ip_event_handler( void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data );
+
+static esp_err_t set_content_type_from_file( httpd_req_t* req, const char* filename );
+static const char* get_path_from_uri( char* dest, const char* base_path, const char* uri, size_t dest_size );
+static esp_err_t download_get_handler( httpd_req_t* req );
+static void wifi_init( void );
 
 /*==================[external functions definition]=========================*/
 
-esp_err_t hello_get_handler(httpd_req_t *req)
-{
-    char*  buf;
-    size_t buf_len;
-
-    /* Get header value string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        /* Copy null terminated value string into buffer */
-        if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Host: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-2") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-2", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-2: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-1") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-1", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-1: %s", buf);
-        }
-        free(buf);
-    }
-
-    /* Read URL query string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found URL query => %s", buf);
-            char param[32];
-            /* Get value of expected key from query string */
-            if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query1=%s", param);
-            }
-            if (httpd_query_key_value(buf, "query3", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query3=%s", param);
-            }
-            if (httpd_query_key_value(buf, "query2", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query2=%s", param);
-            }
-        }
-        free(buf);
-    }
-
-    /* Set some custom headers */
-    httpd_resp_set_hdr(req, "Custom-Header-1", "Custom-Value-1");
-    httpd_resp_set_hdr(req, "Custom-Header-2", "Custom-Value-2");
-
-    /* Send response with custom headers and body set as the
-     * string passed in user context*/
-    const char* resp_str = (const char*) req->user_ctx;
-    httpd_resp_send(req, resp_str, strlen(resp_str));
-
-    /* After sending the HTTP response the old HTTP request
-     * headers are lost. Check if HTTP request headers can be read now. */
-    if (httpd_req_get_hdr_value_len(req, "Host") == 0) {
-        ESP_LOGI(TAG, "Request headers lost");
-    }
-    return ESP_OK;
-}
-
-httpd_uri_t hello = {
-    .uri       = "/hello",
-    .method    = HTTP_GET,
-    .handler   = hello_get_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-    .user_ctx  = "Hello World!"
-};
-
-httpd_handle_t start_webserver(void)
+esp_err_t start_webserver( void )
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
-    // Start the httpd server
+    /* Start the httpd server */
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
-    if (httpd_start(&server, &config) == ESP_OK)
+    if ( httpd_start( &server, &config ) != ESP_OK )
     {
-        // Set URI handlers
-        ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &hello);
-        //httpd_register_uri_handler(server, &echo);
-        //httpd_register_uri_handler(server, &ctrl);
-        return server;
+        ESP_LOGE(TAG, "Failed to start file server!");
+        return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Error starting server!");
-    return NULL;
+    /* URI handler for web interface */
+	httpd_uri_t uri_handler;
+
+	uri_handler.uri = "/index.html";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+    /* URI handler for web interface */
+	uri_handler.uri = "/favicon.ico";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+    /* URI handler for web interface */
+	uri_handler.uri = "/pulses.txt";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+    /* URI handler for web interface */
+	uri_handler.uri = "/jquerymobilecss.css";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+	/* URI handler for web interface */
+	uri_handler.uri = "/jqueryjs.js";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+	/* URI handler for web interface */
+	uri_handler.uri = "/jquerymobilejs.js";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+	/* URI handler for web interface */
+	uri_handler.uri = "/jquerymobilemap.map";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+	/* URI handler for web interface */
+	uri_handler.uri = "/ajax-loadergif.gif";
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	/* Let's pass response string in user
+	 * context to demonstrate it's usage */
+	uri_handler.user_ctx  = scratch;
+	httpd_register_uri_handler( server, &uri_handler );
+
+    return ESP_OK;
 }
 
-void stop_webserver(httpd_handle_t server)
+void web_interface_init( void )
 {
-    // Stop the httpd server
-    httpd_stop(server);
+    ESP_ERROR_CHECK( nvs_flash_init() );
+    ESP_ERROR_CHECK( esp_netif_init() );
+    ESP_ERROR_CHECK( esp_event_loop_create_default() );
+	ESP_ERROR_CHECK( spiffs_init() );
+
+	ESP_LOGI( TAG, "ESP_WIFI_MODE_APSTA" );
+	wifi_init();
+
+	ESP_ERROR_CHECK( start_webserver() );
 }
 
-static void disconnect_handler(void* arg, esp_event_base_t event_base,
-                               int32_t event_id, void* event_data)
-{
-    httpd_handle_t* server = (httpd_handle_t*) arg;
-    if (*server) {
-        ESP_LOGI(TAG, "Stopping webserver");
-        stop_webserver(*server);
-        *server = NULL;
-    }
-}
 
-static void connect_handler(void* arg, esp_event_base_t event_base,
-                            int32_t event_id, void* event_data)
-{
-    httpd_handle_t* server = (httpd_handle_t*) arg;
-    if (*server == NULL) {
-        ESP_LOGI(TAG, "Starting webserver");
-        *server = start_webserver();
-    }
-}
+/*==================[internal functions definition]==========================*/
 
-static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static esp_err_t spiffs_init( void )
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
-    {
-        esp_wifi_connect();
-    }
+    ESP_LOGI(TAG, "Initializing SPIFFS");
 
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
-    {
-        if (s_retry_num < ESP_MAX_RETRY)
-        {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+    esp_vfs_spiffs_conf_t conf = {
+      .base_path = "/spiffs",
+      .partition_label = NULL,
+      .max_files = 5,   // This decides the maximum number of files that can be created on the storage
+      .format_if_mount_failed = true
+    };
+
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            ESP_LOGE(TAG, "Failed to mount or format filesystem");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
         }
-        else
-        {
-            xEventGroupSetBits( xWifiEventGroup, WIFI_FAIL_BIT);
-        }
-        ESP_LOGI(TAG,"connect to the AP fail");
+        return ESP_FAIL;
     }
 
-    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    size_t total = 0, used = 0;
+    ret = esp_spiffs_info(NULL, &total, &used);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
+
+	return ESP_OK;
+}
+
+static void wifi_event_handler( void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data )
+{
+	if( event_base == WIFI_EVENT )
+	{
+		switch( event_id )
+		{
+			case WIFI_EVENT_STA_START:
+			{
+				esp_wifi_connect();
+				break;
+			}
+
+			case WIFI_EVENT_STA_DISCONNECTED:
+			{
+				if ( s_retry_num < ESP_MAX_RETRY )
+				{
+					esp_wifi_connect();
+					s_retry_num++;
+					ESP_LOGI( TAG, "retry to connect to the AP" );
+				}
+				else
+					xEventGroupSetBits( wifi_event_group, WIFI_FAIL_BIT );
+
+				ESP_LOGI(TAG,"connect to the AP fail");
+				break;
+			}
+
+			case WIFI_EVENT_AP_STACONNECTED:
+			{
+				wifi_event_ap_staconnected_t* event = ( wifi_event_ap_staconnected_t* ) event_data;
+				ESP_LOGI( TAG, "station "MACSTR" join, AID=%d", MAC2STR( event->mac ), event->aid );
+				break;
+			}
+
+			case WIFI_EVENT_AP_STADISCONNECTED:
+			{
+		        wifi_event_ap_stadisconnected_t* event = ( wifi_event_ap_stadisconnected_t* ) event_data;
+		        ESP_LOGI( TAG, "station "MACSTR" leave, AID=%d", MAC2STR( event->mac ), event->aid );
+		        break;
+			}
+
+			default:
+				break;
+		}
+	}
+}
+
+static void ip_event_handler( void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data )
+{
+    if ( event_base == IP_EVENT )
     {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits( xWifiEventGroup, WIFI_CONNECTED_BIT);
+    	switch( event_id )
+    	{
+			case IP_EVENT_STA_GOT_IP:
+			{
+				ip_event_got_ip_t * event = ( ip_event_got_ip_t * ) event_data;
+				ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa( &event->ip_info.ip ) );
+				s_retry_num = 0;
+				xEventGroupSetBits( wifi_event_group, WIFI_CONNECTED_BIT );
+				break;
+			}
+
+			default:
+				break;
+    	}
     }
 }
 
-static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+/* corregir para usar switch */
+static esp_err_t set_content_type_from_file( httpd_req_t* req, const char* filename )
 {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+    if ( IS_FILE_EXT( filename, ".pdf" ) )
+    	return httpd_resp_set_type( req, "application/pdf" );
+    else if (IS_FILE_EXT( filename, ".html" ))
+    {
+    	httpd_resp_set_hdr( req, "Content-Encoding", "gzip" );
+       	return httpd_resp_set_type( req, "text/html" );
     }
+    else if (IS_FILE_EXT( filename, ".jpeg" ) )
+    	return httpd_resp_set_type( req, "image/jpeg" );
+    else if ( IS_FILE_EXT( filename, ".ico" ) )
+    	return httpd_resp_set_type( req, "image/x-icon" );
+    else if ( IS_FILE_EXT( filename, ".css" ) )
+    {
+		httpd_resp_set_hdr( req, "Content-Encoding", "gzip" );
+		return httpd_resp_set_type( req, "text/css" );
+    }
+    else if ( IS_FILE_EXT( filename, ".js" ) )
+    {
+    	httpd_resp_set_hdr( req, "Content-Encoding", "gzip" );
+    	return httpd_resp_set_type( req, "application/javascript" );
+    }
+    else if ( IS_FILE_EXT( filename, ".map" ) )
+    {
+    	httpd_resp_set_hdr( req, "Content-Encoding", "gzip" );
+    	return httpd_resp_set_type( req, "application/octet-stream" );
+    }
+
+    else if ( IS_FILE_EXT( filename, ".gif" ) )
+    {
+    	httpd_resp_set_hdr( req, "Content-Encoding", "gzip" );
+    	return httpd_resp_set_type( req, "application/octet-stream" );
+    }
+
+    /* This is a limited set only */
+    /* For any other type always set as plain text */
+    return httpd_resp_set_type( req, "text/plain" );
 }
 
-void vWifiInit( void )
+static const char* get_path_from_uri( char* dest, const char* base_path, const char* uri, size_t dest_size )
 {
-	xWifiEventGroup = xEventGroupCreate();
+	const size_t base_path_len = strlen( base_path );
+	size_t path_len = strlen( uri );
+
+	const char* quest = strchr( uri, '?' );
+	if( quest )
+		path_len = MIN( path_len, quest - uri );
+
+	const char* hash = strchr( uri, '#' );
+		path_len = MIN( path_len, hash - uri );
+
+	if( base_path_len + path_len + 1 > dest_size )
+		return NULL;
+
+	strcpy( dest, base_path );
+	strlcpy( dest + base_path_len, uri, path_len + 1 );
+
+	return dest + base_path_len;
+}
+
+static esp_err_t download_get_handler( httpd_req_t* req )
+{
+	char filepath[ FILE_PATH_MAX ];
+	FILE* fd = NULL;
+	struct stat file_stat;
+
+	const char* filename = get_path_from_uri( filepath, "/spiffs", req->uri, sizeof( filepath ) );
+
+	char filepath_aux[ FILE_PATH_MAX ];
+	strcpy( filepath_aux, filepath );
+
+	char* extension = strchr( filename, '.' );
+
+	if( !strcmp( extension, ".html" ) )
+	{
+		uint8_t i = 0;
+		for( ; filepath_aux[ i ] != '.'; i++ ){}
+		filepath_aux[ i + 1 ] = 'g';
+		filepath_aux[ i + 2 ] = 'z';
+		filepath_aux[ i + 3 ] = '\0';
+	}
+	else if( !strcmp( extension, ".js" ) )
+	{
+		uint8_t i = 0;
+		for( ; filepath_aux[ i ] != '.'; i++ ){}
+		filepath_aux[ i + 1 ] = 'g';
+		filepath_aux[ i + 2 ] = 'z';
+		filepath_aux[ i + 3 ] = '\0';
+	}
+	else if( !strcmp( extension, ".css" ) )
+	{
+		uint8_t i = 0;
+		for( ; filepath_aux[ i ] != '.'; i++ ){}
+		filepath_aux[ i + 1 ] = 'g';
+		filepath_aux[ i + 2 ] = 'z';
+		filepath_aux[ i + 3 ] = '\0';
+	}
+	else if( !strcmp( extension, ".map" ) )
+	{
+		uint8_t i = 0;
+		for( ; filepath_aux[ i ] != '.'; i++ ){}
+		filepath_aux[ i + 1 ] = 'g';
+		filepath_aux[ i + 2 ] = 'z';
+		filepath_aux[ i + 3 ] = '\0';
+	}
+	else if( !strcmp( extension, ".gif" ) )
+	{
+		uint8_t i = 0;
+		for( ; filepath_aux[ i ] != '.'; i++ ){}
+		filepath_aux[ i + 1 ] = 'g';
+		filepath_aux[ i + 2 ] = 'z';
+		filepath_aux[ i + 3 ] = '\0';
+	}
+
+
+
+
+	if( !filename )
+	{
+		ESP_LOGE( TAG, "Filename is too long" );
+
+		httpd_resp_send_500( req );
+		return ESP_FAIL;
+	}
+
+	if( stat( filepath_aux, &file_stat ) == -1 )
+	{
+        ESP_LOGE( TAG, "Failed to stat file : %s", filepath_aux );
+        /* Respond with 404 Not Found */
+        httpd_resp_send_404( req );
+        return ESP_FAIL;
+	}
+
+    fd = fopen( filepath_aux, "r");
+    if (!fd) {
+        ESP_LOGE(TAG, "Failed to read existing file : %s", filepath_aux);
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_500( req );
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Sending file : %s (%ld bytes)...", filename, file_stat.st_size);
+
+    set_content_type_from_file( req, filename );
+    httpd_resp_set_hdr( req, "Access-Control-Allow-Origin", "*" );
+
+
+    /* Retrieve the pointer to scratch buffer for temporary storage */
+    char *chunk = ( char* )req->user_ctx;
+    size_t chunksize;
+    do {
+        /* Read file in chunks into the scratch buffer */
+        chunksize = fread(chunk, 1, SCRATCH_BUFSIZE, fd);
+
+        if (chunksize > 0) {
+            /* Send the buffer contents as HTTP response chunk */
+            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+                fclose(fd);
+                ESP_LOGE(TAG, "File sending failed!");
+
+                /* Respond with 500 Internal Server Error */
+                httpd_resp_send_500( req );
+               return ESP_FAIL;
+           }
+        }
+
+        /* Keep looping till the whole file is sent */
+    } while (chunksize != 0);
+
+    /* Close file after sending complete */
+    fclose(fd);
+    ESP_LOGI(TAG, "File sending complete");
+
+    /* Respond with an empty chunk to signal HTTP response completion */
+    httpd_resp_send_chunk( req, NULL, 0 );
+    return ESP_OK;
+}
+
+static void wifi_init( void )
+{
+	wifi_event_group = xEventGroupCreate();
 
     tcpip_adapter_init();
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
+    /* se inicializa wifi con la configuración por defecto */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK( esp_wifi_init( &cfg ) );
 
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL)); // sta
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL)); // sta
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL)); // ap
+    /* se registran los handler de los eventos de wifi e ip */
+    ESP_ERROR_CHECK(esp_event_handler_register( WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL ) ); // sta
+    ESP_ERROR_CHECK(esp_event_handler_register( IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL ) ); // sta
 
+    /* se definen los parámetros de configuración del modo AP */
     wifi_config_t wifi_config_ap =
     {
 		.ap =
@@ -261,6 +463,7 @@ void vWifiInit( void )
 		},
     };
 
+    /* se definen los parámetros de configuración del modo STA */
     wifi_config_t wifi_config_sta =
     {
 		.sta =
@@ -270,21 +473,21 @@ void vWifiInit( void )
 		},
     };
 
+    /* se define el modo de wifi en AP y STA */
+    ESP_ERROR_CHECK( esp_wifi_set_mode( WIFI_MODE_APSTA ) );
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config_sta) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config_ap) );
+    /* se configuran los parámetros de los modos AP y STA */
+    ESP_ERROR_CHECK( esp_wifi_set_config( ESP_IF_WIFI_STA, &wifi_config_sta ) );
+    ESP_ERROR_CHECK( esp_wifi_set_config( ESP_IF_WIFI_AP, &wifi_config_ap ) );
 
-    if( strlen( AP_WIFI_PASS ) == 0 )
-    	wifi_config_ap.ap.authmode = WIFI_AUTH_OPEN;
-
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    /* se inicializa wifi */
+    ESP_ERROR_CHECK( esp_wifi_start() );
 
     ESP_LOGI(TAG, "wifi_init finished. AP SSID:%s AP password:%s", AP_WIFI_SSID, AP_WIFI_PASS);
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits( xWifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    EventBits_t bits = xEventGroupWaitBits( wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
@@ -294,26 +497,6 @@ void vWifiInit( void )
         ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s", STA_WIFI_SSID, STA_WIFI_PASS);
     else
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
-
-    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));
-    vEventGroupDelete( xWifiEventGroup );
 }
-
-void vWebServerInit( void )
-{
-
-	ESP_ERROR_CHECK( nvs_flash_init() );
-	ESP_LOGI( TAG, "ESP_WIFI_MODE_APSTA" );
-	vWifiInit();
-
-	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
-	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
-
-	server = start_webserver();
-}
-
-
-/*==================[internal functions definition]==========================*/
 
 /*==================[end of file]============================================*/

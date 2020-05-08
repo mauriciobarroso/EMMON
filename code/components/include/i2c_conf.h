@@ -33,16 +33,16 @@
 
 /* Date: 10/12/19 */
 
-#ifndef _LCD2004_H_
-#define _LCD2004_H_
+#ifndef _I2C_CONF_H_
+#define _I2C_CONF_H_
 
 /*==================[inclusions]=============================================*/
 
 #include <stdint.h>
-#include <stdbool.h>
+#include "freertos/FreeRTOS.h"
 #include "driver/i2c.h"
+#include "esp_err.h"
 #include "rom/ets_sys.h"
-#include "i2c_conf.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -52,67 +52,40 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define PCF8574_ADDR				0x3F             /* slave address for LCD 20x4 */
+#ifndef I2C_MASTER_SCL_IO
+#define I2C_MASTER_SCL_IO			5	 			/* gpio number for I2C master clock */
+#define I2C_MASTER_SDA_IO           2				/* gpio number for I2C master data  */
+#define I2C_MASTER_NUM              I2C_NUM_0		/* I2C port number for master dev */
+#define I2C_MASTER_TX_BUF_DISABLE   0				/* I2C master do not need buffer */
+#define I2C_MASTER_RX_BUF_DISABLE   0				/* I2C master do not need buffer */
+#endif
 
-#define LINE_1_ADDR					0x0
-#define LINE_2_ADDR					0x40
-#define LINE_3_ADDR					0x14
-#define LINE_4_ADDR					0x54
+#define WRITE_BIT                   I2C_MASTER_WRITE /* I2C master write */
+#define READ_BIT                    I2C_MASTER_READ  /* I2C master read */
+#define ACK_CHECK_EN                0x1              /* I2C master will check ack from slave*/
+#define ACK_CHECK_DIS               0x0              /* I2C master will not check ack from slave */
+#define ACK_VAL                     0x0              /* I2C ack value */
+#define NACK_VAL                    0x1              /* I2C nack value */
+#define LAST_NACK_VAL               0x2              /* I2C last_nack value */
 
 #define MS							1000
-
-#define BV(x)						( 1 << ( x ) )
-
-#define DELAY_CMD_LONG  			( 3 * MS ) // >1.53ms according to datasheet
-#define DELAY_CMD_SHORT 			( 60 )     // >39us according to datasheet
-#define DELAY_TOGGLE    			( 1 )      // E cycle time >= 1μs, E pulse width >= 450ns, Data set-up time >= 195ns
-#define DELAY_INIT      			( 5 * MS )
-
-#define CMD_CLEAR        			0x01
-#define CMD_RETURN_HOME  			0x02
-#define CMD_ENTRY_MODE   			0x04
-#define CMD_DISPLAY_CTRL 			0x08
-#define CMD_SHIFT        			0x10
-#define CMD_FUNC_SET     			0x20
-#define CMD_CGRAM_ADDR   			0x40
-#define CMD_DDRAM_ADDR   			0x80
-
-// CMD_ENTRY_MODE
-#define ARG_EM_INCREMENT    		BV(1)
-#define ARG_EM_SHIFT        		(1)
-
-// CMD_DISPLAY_CTRL
-#define ARG_DC_DISPLAY_ON  			BV( 2 )
-#define ARG_DC_CURSOR_ON   		 	BV( 1 )
-#define ARG_DC_CURSOR_BLINK 		( 1 )
-
-// CMD_FUNC_SET
-#define ARG_FS_8_BIT        		BV( 4 )
-#define ARG_FS_2_LINES      		BV( 3 )
-#define ARG_FS_FONT_5X10    		BV( 2 )
-
-#define init_delay()   				do { ets_delay_us( DELAY_INIT ); } while ( 0 )
-#define short_delay()  				do { ets_delay_us( DELAY_CMD_SHORT ); } while ( 0 )
-#define long_delay()   				do { ets_delay_us( DELAY_CMD_LONG ); } while ( 0 )
-#define toggle_delay() 				do { ets_delay_us( DELAY_TOGGLE ); } while ( 0 )
+#define DELAY			  			( 5 * MS ) // >1.53ms according to datasheet
+#define write_cycle_delay()			do { ets_delay_us( DELAY ); } while ( 0 )
 
 /*==================[typedef]================================================*/
-typedef enum
-{
-	HD44780_FONT_5X8 = 0,
-	HD44780_FONT_5X10
-} hd44780_font_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-void lcd_init( void );
-void lcd_control( bool on, bool cursor, bool cursor_blink );
-void lcd_clear( void );
-void lcd_gotoxy( uint8_t col, uint8_t line );
-void lcd_putc( char character );
-void lcd_puts( const char *string );
+esp_err_t i2c_init( void );
+esp_err_t i2c_write_reg0( uint8_t device_address, uint8_t *data, size_t data_len );
+esp_err_t i2c_read_reg0( uint8_t device_address, uint8_t *data, size_t data_len );
+esp_err_t i2c_write_reg8( uint8_t device_address, uint8_t reg_address, uint8_t *data, size_t data_len );
+esp_err_t i2c_read_reg8( uint8_t device_address, uint8_t reg_address, uint8_t *data, size_t data_len );
+esp_err_t i2c_write_reg16( uint8_t device_address, uint16_t reg_address, uint8_t *data, size_t data_len );
+esp_err_t i2c_read_reg16( uint8_t device_address, uint16_t reg_address, uint8_t *data, size_t data_len );
+
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -122,4 +95,4 @@ void lcd_puts( const char *string );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _LCD2004_H_ */
+#endif /* #ifndef _I2C_CONF_H_ */

@@ -1,37 +1,9 @@
-/* Copyright 2020, Mauricio Barroso
- * All rights reserved.
+/*
+ * data_logger.h
  *
- * This file is part of EMMON.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
+ * Created on: Nov 1, 2019
+ * Author: Mauricio Barroso
  */
-
-/* Date: 10/12/19 */
 
 #ifndef _DATALOGGER_H_
 #define _DATALOGGER_H_
@@ -41,9 +13,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "queue.h"
+
+#include "driver/gpio.h"
+
+#include "esp_system.h"
+#include "esp_log.h"
+
+#include "i2c_conf.h"
 #include "at24c32.h"
 #include "ds3231.h"
 
+#include "dataTransmission.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -53,40 +36,38 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define EEPROM_SETTINGS_ADDR	0x0		// direccion en la eeprom donde se guarda los device settings
-#define EEPROM_USER_ID_ADDR		0x10	// direccion en la eeprom donde se guarda el user ID
-#define EEPROM_INDEX_ADDR		0x20	// dirección en la eeprom donde se guarda la fecha
-#define	EEPROM_QTY_DAYS			0x22	// dirección en la eeprom donde se guarda la cantidad de dias monitoreados
-#define EEPROM_BASE_INDEX_ADDR	0x30	// dirección en la eeprom donde se guarda el conteo de pulsos
-#define DATA_SIZE				5		// tamaño en Bytes de los datos guardados en la EEPROM
+/*  debug mode*/
+#define DEBUG_MODE
 
-
+/* definicion de pines de interrupcion */
+#define GPIO_PULSES			0	/*!< pulses interrupt pin */
+#define GPIO_ALARM			3	/*!< alarm interrupt pin */
 
 /*==================[typedef]================================================*/
 
 typedef struct
 {
-	uint16_t usCount;
-	uint32_t ulID;
-	uint16_t usIndex;
-	uint16_t usDaysCount;
-	ds3231_t xRtc;
-} DataLogger_t;
+	ds3231_t rtc;						/*!< RTC data */
+	data_transmission_t transmission;	/*!< transmission data */
+	uint16_t daily_pulses;				/*!< daily counted pulses */
+	uint32_t monthly_pulses;			/*!< monthly rquantity monthly of logged days */
+	uint16_t monthly_logged_days;		/*!< monthly quantity of logged days */
+	uint16_t total_logged_days;			/*!< total quantity of logged days */
+	uint32_t id;						/*!< user ID */
+	uint16_t index;						/*!< eeprom index data */
+} data_logger_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-uint16_t usDataLoggerGetIndex( void );
-uint16_t usDataLoggerGetCount( uint16_t usAddress );
-uint16_t usDataLoggerGetDaysCount( void );
-uint32_t ulDataLoggerGetID( void );
-void vDataLoggerSetIndex( uint16_t usIndex );
-void vDataLoggerSetCount( uint16_t usAdress, uint16_t usCount );
-void vDataLoggerSetDaysCount( uint16_t usDaysCount );
-void vDataLoggerSetID( uint32_t ulID );
-void vDataLoggerSetCurrentDate( void );
-void vDataLoggerInit( DataLogger_t *xData );
+/**
+ * @brief Data Logger initialization
+ */
+void data_logger_init( data_logger_t * const me );
+
+// implementar una función para borrar eeprom
+// implementar una función para obtener log historico
 
 /*==================[cplusplus]==============================================*/
 

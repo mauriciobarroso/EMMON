@@ -39,6 +39,30 @@
 
 /*==================[macros]=================================================*/
 
+/* Device REGess */
+#define DS3231_ADDR			0x68	/*!< slave REGess of DS3231 RTC */
+
+/* Timekeeping Registers */
+#define SECONDS_REG			0x0		/*!< Seconds register REGess of DS3231 RTC */
+#define MINUTES_REG			0x1		/*!< Minutes register REGess of DS3231 RTC */
+#define HOURS_REG			0x2		/*!< Hours register REGess of DS3231 RTC */
+#define DAY_REG				0x3		/*!< Day register REGess of DS3231 RTC */
+#define DATE_REG 			0x4		/*!< Date register REGess of DS3231 RTC */
+#define MONTH_REG			0x5		/*!< Month register REGess of DS3231 RTC */
+#define YEAR_REG			0x6		/*!< Year register REGess of DS3231 RTC */
+#define ALARM1_SECONDS_REG	0x7		/*!< Alarm 1 Seconds register REGess of DS3231 RTC */
+#define ALARM1_MINUTES_REG	0x8		/*!< Alarm 1 Minutes register REGess of DS3231 RTC */
+#define ALARM1_HOURS_REG	0x9		/*!< Alarm 1 Hours register REGess of DS3231 RTC */
+#define ALARM1_DAYDATE_REG	0xA		/*!< Alarm 1 Day/Date register REGess of DS3231 RTC */
+#define ALARM2_MINUTES_REG	0xB		/*!< Alarm 2 Minutes register REGess of DS3231 RTC */
+#define ALARM2_HOURS_REG	0xC		/*!< Alarm 2 Hours register REGess of DS3231 RTC */
+#define ALARM2_DAYDATE_REG	0xD		/*!< Alarm 2 Day/Date register REGess of DS3231 RTC */
+#define CONTROL_REG			0xE		/*!< Control register REGess of DS3231 RTC */
+#define CONTROL_STATUS_REG	0xF		/*!< Control/Status register REGess of DS3231 RTC */
+#define AGING_OFFSET_REG	0x10	/*!< Aging Offfset register REGess of DS3231 RTC */
+#define MSB_TEMP_REG		0x11	/*!< MSB of Temp register REGess of DS3231 RTC */
+#define LSB_TEMP_REG		0x12	/*!< LSB of Temp register REGess of DS3231 RTC */
+
 /*==================[typedef]================================================*/
 
 /*==================[internal data declaration]==============================*/
@@ -47,249 +71,176 @@
 
 /*==================[internal functions declaration]=========================*/
 
-static esp_err_t ds3231_write_reg( i2c_port_t i2c_num, uint8_t reg_address, uint8_t * data, size_t data_len );
-static esp_err_t ds3231_read_reg( i2c_port_t i2c_num, uint8_t reg_address, uint8_t * data, size_t data_len );
-static esp_err_t i2c_init();
-
 /*==================[external functions definition]=========================*/
 
-extern esp_err_t ds3231_init( ds3231_t *ds3231_data )
-{
-	esp_err_t ret;
-
-	ret = i2c_init();
-
-	return ret;
-}
-
-extern esp_err_t ds3231_get_time( ds3231_t *ds3231_data )
+esp_err_t ds3231_get_time( ds3231_t * const me )
 {
 	esp_err_t ret;
 	uint8_t data[ 3 ];
 
-	ret = ds3231_read_reg( I2C_MASTER_NUM, DS3231_SECONDS_ADDR, data, sizeof( data ) );
+	ret = i2c_read_reg8( DS3231_ADDR, SECONDS_REG, data, sizeof( data ) );
 
-	ds3231_data->time.seconds = data[ 0 ];
-	ds3231_data->time.minutes = data[ 1 ];
-	ds3231_data->time.hours = data[ 2 ];
+	me->time.seconds = data[ 0 ];
+	me->time.minutes = data[ 1 ];
+	me->time.hours = data[ 2 ];
 
 	return ret;
 }
 
-extern esp_err_t ds3231_get_date( ds3231_t *ds3231_data )
+esp_err_t ds3231_get_date( ds3231_t * const me )
 {
 	esp_err_t ret;
 	uint8_t data[ 4 ];
 
-	ret = ds3231_read_reg( I2C_MASTER_NUM, DS3231_DAY_ADDR, data, sizeof( data ) );
+	ret = i2c_read_reg8( DS3231_ADDR, DAY_REG, data, sizeof( data ) );
 
-	ds3231_data->date.day = data[ 0 ];
-	ds3231_data->date.date = data[ 1 ];
-	ds3231_data->date.month = data[ 2 ];
-	ds3231_data->date.year = data[ 3 ];
+	me->date.day = data[ 0 ];
+	me->date.date = data[ 1 ];
+	me->date.month = data[ 2 ];
+	me->date.year = data[ 3 ];
 
 	return ret;
 }
 
-extern esp_err_t ds3231_set_time( ds3231_t *ds3231_data )
+esp_err_t ds3231_set_time( ds3231_t * const me )
 {
 	esp_err_t ret;
 	uint8_t data[ 3 ];
 
-	data[ 0 ] = ds3231_data->time.seconds;
-	data[ 1 ] = ds3231_data->time.minutes;
-	data[ 2 ] = ds3231_data->time.hours;
+	data[ 0 ] = me->time.seconds;
+	data[ 1 ] = me->time.minutes;
+	data[ 2 ] = me->time.hours;
 
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_SECONDS_ADDR, data, sizeof( data ) );
+	ret = i2c_write_reg8( DS3231_ADDR, SECONDS_REG, data, sizeof( data ) );
 
 	return ret;
 }
 
-extern esp_err_t ds3231_set_date( ds3231_t *ds3231_data )
+esp_err_t ds3231_set_date( ds3231_t * const me )
 {
 	esp_err_t ret;
 	uint8_t data[ 4 ];
 
-	data[ 0 ] = ds3231_data->date.day;
-	data[ 1 ] = ds3231_data->date.date;
-	data[ 2 ] = ds3231_data->date.month;
-	data[ 3 ] = ds3231_data->date.year;
+	data[ 0 ] = me->date.day;
+	data[ 1 ] = me->date.date;
+	data[ 2 ] = me->date.month;
+	data[ 3 ] = me->date.year;
 
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_DAY_ADDR, data, sizeof( data ) );
+	ret = i2c_write_reg8( DS3231_ADDR, DAY_REG, data, sizeof( data ) );
 
 	return ret;
 }
 
-extern esp_err_t ds3231_get_alarm1( ds3231_t *ds3231_data )
+esp_err_t ds3231_get_alarm( ds3231_t * const me, ds3231_alarm_number_t number )
 {
 	esp_err_t ret;
 
-	ret = ds3231_read_reg( I2C_MASTER_NUM, DS3231_ALARM1_SECONDS_ADDR, ( uint8_t *)&ds3231_data->alarm1, 4 );
-
+	if( number == ALARM1 )
+		ret = i2c_read_reg8( DS3231_ADDR, ALARM1_SECONDS_REG, ( uint8_t *)&me->alarm1, 4 );
+	else
+		ret = i2c_read_reg8( DS3231_ADDR, ALARM1_SECONDS_REG, ( uint8_t *)&me->alarm2, 3 );
 
 	return ret;
 }
-/*
-extern esp_err_t ds3231_get_alarm2( ds3231_alarm2_t * alarm )
+
+esp_err_t ds3231_set_alarm( ds3231_t * const me, ds3231_alarm_number_t number )
 {
 	esp_err_t ret;
-	uint8_t data_alarm [ 4 ];
 
-	ret = ds3231_read_reg( I2C_MASTER_NUM, DS3231_ALARM2_MINUTES_ADDR, data_alarm, 4 );
+	if( number == ALARM1 )
+	{
+		uint8_t data[ 4 ];
+		data[ 0 ] = me->alarm1.seconds | ( ( me->alarm1.mode & 0x1 ) << 7 );
+		data[ 1 ] = me->alarm1.minutes | ( ( me->alarm1.mode & 0x2 ) << 6 );
+		data[ 2 ] = me->alarm1.hours | ( ( me->alarm1.mode & 0x4 ) << 5 );
+		data[ 3 ] = me->alarm1.daydate | ( ( me->alarm1.mode & 0x8 ) << 4 );
+		//data[ 3 ] = me->alarm1.daydate | ( ( me->alarm1.mode & 0x10 ) << 2 );
 
-	alarm->minutes = data_alarm[ 0 ];
-	alarm->hours = data_alarm[ 1 ];
-	alarm->dydt = data_alarm[ 2 ];
+		ret = i2c_write_reg8( DS3231_ADDR, ALARM1_SECONDS_REG, data, 4 );
+	}
+	else
+	{
+		uint8_t data[ 3 ];
 
-	return ret;
-}
-*/
-extern esp_err_t ds3231_set_alarm1( ds3231_t *ds3231_data )
-{
-	esp_err_t ret;
-	uint8_t data[ 4 ];
+		data[ 0 ] = me->alarm2.minutes | ( ( me->alarm2.mode << 7 ) & 0x80 );
+		data[ 1 ] = me->alarm2.hours | ( ( me->alarm2.mode << 6 ) & 0x80 );
+		data[ 2 ] = me->alarm2.daydate | ( ( me->alarm2.mode << 5 ) & 0x80 );
+		//data[ 2 ] = me->alarm2.daydate | ( ( me->alarm2.mode << 3 ) & 0x40 );
 
-	data[ 0 ] = ds3231_data->alarm1.seconds | ( ( ds3231_data->alarm1.mode & 0x1 ) << 7 );
-	data[ 1 ] = ds3231_data->alarm1.minutes | ( ( ds3231_data->alarm1.mode & 0x2 ) << 6 );
-	data[ 2 ] = ds3231_data->alarm1.hours | ( ( ds3231_data->alarm1.mode & 0x4 ) << 5 );
-	data[ 3 ] = ds3231_data->alarm1.daydate | ( ( ds3231_data->alarm1.mode & 0x8 ) << 4 );
-	//data[ 3 ] = ds3231_data->alarm1.daydate | ( ( ds3231_data->alarm1.mode & 0x10 ) << 2 );
-
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_ALARM1_SECONDS_ADDR, data, 4 );
-
-	return ret;
-}
-
-extern esp_err_t ds3231_set_alarm2( ds3231_t *ds3231_data )
-{
-	esp_err_t ret;
-	uint8_t data_alarm[ 3 ];
-
-	data_alarm[ 0 ] = ds3231_data->alarm2.minutes | ( ( ds3231_data->alarm2.mode << 7 ) & 0x80 );
-	data_alarm[ 1 ] = ds3231_data->alarm2.hours | ( ( ds3231_data->alarm2.mode << 6 ) & 0x80 );
-	data_alarm[ 2 ] = ds3231_data->alarm2.daydate | ( ( ds3231_data->alarm2.mode << 5 ) & 0x80 );
-	data_alarm[ 2 ] = ds3231_data->alarm2.daydate | ( ( ds3231_data->alarm2.mode << 3 ) & 0x40 );
-
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_ALARM2_MINUTES_ADDR, data_alarm, 4 );
+		ret = i2c_write_reg8( DS3231_ADDR, ALARM2_MINUTES_REG, data, 3 );
+	}
 
 	return ret;
 }
 
-extern esp_err_t ds3231_set_alarm_interrupt( ds3231_t *ds3231_data )
+esp_err_t ds3231_set_alarm_interrupt( ds3231_t * const me )
 {
 	esp_err_t ret;
 	uint8_t data;
 
-	data = ds3231_data->alarm_interrupt_mode;
+	data = me->alarm_interrupt_mode;
 
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_CONTROL_ADDR, &data, 1 );
+	ret = i2c_write_reg8( DS3231_ADDR, CONTROL_REG, &data, 1 );
 
 	return ret;
 }
 /*
-extern esp_err_t ds3231_set_sqw_output( ds3231_sqw_output_t mode )
+esp_err_t ds3231_set_sqw_output( ds3231_sqw_output_t mode )
 {
 	esp_err_t ret;
-	uint8_t data_mode;
+	uint8_t data;
 
-	data_mode = mode;
+	data = mode;
 
-	ret = ds3231_write_reg( I2C_MASTER_NUM, DS3231_CONTROL_ADDR, &data_mode, 1 );
+	ret = i2c_write_reg8( DS3231_ADDR, CONTROL_REG, &data, 1 );
 
 	return ret;
-} */
+}*/
 
-void get_control( uint8_t *data )
+void ds3231_get_control( uint8_t *data )
 {
-	ds3231_read_reg( I2C_MASTER_NUM, DS3231_CONTROL_ADDR, data, 1 );
+	i2c_read_reg8( DS3231_ADDR, CONTROL_REG, data, 1 );
 }
 
-void get_control_status( uint8_t *data )
+void ds3231_get_control_status( uint8_t *data )
 {
-	ds3231_read_reg( I2C_MASTER_NUM, DS3231_CONTROL_STATUS_ADDR, data, 1 );
+	i2c_read_reg8( DS3231_ADDR, CONTROL_STATUS_REG, data, 1 );
 }
 
-bool get_alarm1_flag( void )
+bool ds3231_get_alarm_flag( uint8_t alarm )
 {
 	uint8_t data;
 
-	get_control_status( &data );
+	ds3231_get_control_status( &data );
 
-	if( !( data & 0x1 ) )
-		return false;
+	if( alarm == 1 )
+	{
+		if( !( data & 0x1 ) )
+			return false;
+	}
+	else
+	{
+		if( !( data & 0x2 ) )
+			return false;
+	}
 
 	return true;
 }
 
-void clear_alarm1_flag( void )
+void ds3231_clear_alarm_flag( uint8_t alarm )
 {
 	uint8_t data;
 
-	get_control_status( &data );
+	ds3231_get_control_status( &data );
 
-	data &= 0xFE;
+	if( alarm == 1 )
+		data &= 0xFE;
+	else
+		data &= 0xFD;
 
-	ds3231_write_reg( I2C_MASTER_NUM, DS3231_CONTROL_STATUS_ADDR, &data, 1 );
+	i2c_write_reg8( DS3231_ADDR, CONTROL_STATUS_REG, &data, 1 );
 }
 
 /*==================[internal functions definition]==========================*/
-
-static esp_err_t ds3231_write_reg( i2c_port_t i2c_num, uint8_t reg_address, uint8_t * data, size_t data_len )
-{
-	int ret;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start( cmd );
-    i2c_master_write_byte( cmd, DS3231_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN );
-    i2c_master_write_byte( cmd, reg_address, ACK_CHECK_EN );
-    i2c_master_write( cmd, data, data_len, ACK_CHECK_EN );
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin( i2c_num, cmd, 1000 / portTICK_RATE_MS );
-    i2c_cmd_link_delete( cmd );
-
-    return ret;
-}
-
-static esp_err_t ds3231_read_reg( i2c_port_t i2c_num, uint8_t reg_address, uint8_t * data, size_t data_len )
-{
-	int ret;
-	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-	i2c_master_start( cmd );
-	i2c_master_write_byte( cmd, DS3231_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN );
-	i2c_master_write_byte( cmd, reg_address, ACK_CHECK_EN );
-	i2c_master_stop( cmd );
-	ret = i2c_master_cmd_begin( i2c_num, cmd, 1000 / portTICK_RATE_MS );
-	i2c_cmd_link_delete( cmd );
-
-	if ( ret != ESP_OK )
-		return ret;
-
-	cmd = i2c_cmd_link_create();
-	i2c_master_start( cmd );
-	i2c_master_write_byte( cmd, DS3231_ADDR << 1 | READ_BIT, ACK_CHECK_EN );
-	i2c_master_read( cmd, data, data_len, LAST_NACK_VAL );
-	i2c_master_stop( cmd );
-	ret = i2c_master_cmd_begin( i2c_num, cmd, 1000 / portTICK_RATE_MS );
-	i2c_cmd_link_delete( cmd );
-
-	return ret;
-}
-
-static esp_err_t i2c_init()
-{
-    int i2c_master_port = I2C_MASTER_NUM;
-    i2c_config_t conf;
-
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_IO;
-    conf.sda_pullup_en = 1;
-    conf.scl_io_num = I2C_MASTER_SCL_IO;
-    conf.scl_pullup_en = 1;
-    conf.clk_stretch_tick = 300; // 300 ticks, Clock stretch is about 210us, you can make changes according to the actual situation.
-    ESP_ERROR_CHECK( i2c_driver_delete( i2c_master_port ) );
-    ESP_ERROR_CHECK( i2c_driver_install( i2c_master_port, conf.mode ) );
-    ESP_ERROR_CHECK( i2c_param_config( i2c_master_port, &conf ));
-
-    return ESP_OK;
-}
 
 /*==================[end of file]============================================*/

@@ -1,377 +1,691 @@
-/* Copyright 2019, Mauricio Barroso
- * All rights reserved.
- *
- * This file is part of arquitecturaDeMicroprocesadores.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- */
-
-/* Date: 10/12/19 */
-
 /*==================[inlcusions]============================================*/
 
 #include "sx127x.h"
 
 /*==================[macros]=================================================*/
 
-/*==================[typedef]================================================*/
+/* registers */
+#define REG_FIFO                 	0x00
+#define REG_OP_MODE              	0x01
+#define REG_FRF_MSB              	0x06
+#define REG_FRF_MID              	0x07
+#define REG_FRF_LSB              	0x08
+#define REG_PA_CONFIG            	0x09
+#define REG_OCP                  	0x0b
+#define REG_LNA                  	0x0c
+#define REG_FIFO_ADDR_PTR        	0x0d
+#define REG_FIFO_TX_BASE_ADDR    	0x0e
+#define REG_FIFO_RX_BASE_ADDR    	0x0f
+#define REG_FIFO_RX_CURRENT_ADDR 	0x10
+#define REG_IRQ_FLAGS            	0x12
+#define REG_RX_NB_BYTES          	0x13
+#define REG_PKT_SNR_VALUE        	0x19
+#define REG_PKT_RSSI_VALUE       	0x1a
+#define REG_MODEM_CONFIG_1       	0x1d
+#define REG_MODEM_CONFIG_2       	0x1e
+#define REG_PREAMBLE_MSB         	0x20
+#define REG_PREAMBLE_LSB         	0x21
+#define REG_PAYLOAD_LENGTH       	0x22
+#define REG_MODEM_CONFIG_3       	0x26
+#define REG_FREQ_ERROR_MSB       	0x28
+#define REG_FREQ_ERROR_MID       	0x29
+#define REG_FREQ_ERROR_LSB       	0x2a
+#define REG_RSSI_WIDEBAND        	0x2c
+#define REG_DETECTION_OPTIMIZE   	0x31
+#define REG_INVERTIQ             	0x33
+#define REG_DETECTION_THRESHOLD  	0x37
+#define REG_SYNC_WORD            	0x39
+#define REG_INVERTIQ2            	0x3b
+#define REG_DIO_MAPPING_1        	0x40
+#define REG_VERSION              	0x42
+#define REG_PA_DAC               	0x4d
 
-typedef enum {
-    SPI_SEND = 0,
-    SPI_RECV
-} spi_master_mode_t;
+/* modes */
+#define MODE_LONG_RANGE_MODE     	0x80
+#define MODE_SLEEP               	0x00
+#define MODE_STDBY               	0x01
+#define MODE_TX                  	0x03
+#define MODE_RX_CONTINUOUS       	0x05
+#define MODE_RX_SINGLE           	0x06
+
+/* PA config */
+#define PA_BOOST                 	0x80
+
+/* IRQ masks */
+#define IRQ_TX_DONE_MASK           	0x08
+#define IRQ_PAYLOAD_CRC_ERROR_MASK	0x20
+#define IRQ_RX_DONE_MASK           	0x40
+
+/* max packet length */
+#define MAX_PKT_LENGTH				255
+
+/*==================[typedef]================================================*/
 
 /*==================[internal data declaration]==============================*/
 
-static int __implicit;
 static long __frequency;
+static int __packet_index;
+static int __implicit_header_mode;
+//static void ( *__onReceive )( int );
+static void ( *__onTxDone )( void );
 
 /*==================[external data declaration]==============================*/
 
 /*==================[internal functions declaration]=========================*/
+/* read and write registers */
+static void write_reg( uint8_t reg, uint8_t value );
+static uint8_t read_reg( uint8_t reg );
 
-static void spi_transmit( spi_master_mode_t trans_mode, uint32_t data, uint32_t addr );
-static void sx127x_write_reg( uint32_t reg, uint32_t data );
-static uint32_t sx127x_read_reg( uint32_t reg );
+/* header mode */
+static void explicit_header_mode( void );
+static void implicit_header_mode( void );
+
+//static void lora_handleDio0Rise( void );
+static bool is_transmitting( void );
+
+static int get_spreading_factor( void );
+static long get_signal_bandwidth( void );
+
+static void set_ldo_flag( void );
 
 /*==================[external functions definition]=========================*/
 
-extern void lora_reset( void )
+int lora_begin( long frequency )
 {
-	gpio_set_level( SX127X_RESET_PIN, 0 );
-	vTaskDelay( pdMS_TO_TICKS( 1 ) );
-	gpio_set_level( SX127X_RESET_PIN, 1 );
-	vTaskDelay( pdMS_TO_TICKS( 10 ) );
-}
+	/* reset lora */
+    if (SX127X_RESET_PIN != -1) {
+        gpio_config_t io_conf;
+        io_conf.intr_type = GPIO_INTR_DISABLE;
+        io_conf.mode = GPIO_MODE_OUTPUT;
+        io_conf.pin_bit_mask = SX127X_RESET_PIN_MASK;
+        io_conf.pull_down_en = 0;
+        io_conf.pull_up_en = 0;
+        gpio_config( &io_conf );
 
-extern void lora_explicit_header_mode( void )
-{
-	__implicit = 0;
-
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_1, sx127x_read_reg( SX127X_REG_MODEM_CONFIG_1 ) & 0xFE );
-}
-
-extern void lora_implicit_header_mode( int size )
-{
-	__implicit = 1;
-
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_1, sx127x_read_reg( SX127X_REG_MODEM_CONFIG_1 ) | 0x01 );
-	sx127x_write_reg( SX127X_REG_PAYLOAD_LENGTH, size );
-}
-
-extern void lora_idle( void )
-{
-	sx127x_write_reg( SX127X_REG_OP_MODE, LONG_RANGE_MODE | STDBY );
-}
-
-extern void lora_sleep( void )
-{
-	sx127x_write_reg( SX127X_REG_OP_MODE, LONG_RANGE_MODE | SLEEP );
-}
-
-extern void lora_receive( void )
-{
-	sx127x_write_reg( SX127X_REG_OP_MODE, LONG_RANGE_MODE | RX_CONTINUOUS );
-}
-
-extern void lora_set_tx_power( int level )
-{
-	if( level < 2 )
-		level = 2;
-	else if( level > 17 )
-		level = 17;
-
-	sx127x_write_reg( SX127X_REG_PA_CONFIG, PA_BOOST | ( level - 2 ) );
-}
-
-extern void lora_set_frequency( long frequency )
-{
-	__frequency = frequency;
-
-	uint64_t frf = ( ( uint64_t )frequency << 19 ) / 32000000;
-
-	sx127x_write_reg( SX127X_REG_FRF_MSB, ( uint8_t )( frf >> 16 ) );
-	sx127x_write_reg( SX127X_REG_FRF_MID, ( uint8_t )( frf >> 8 ) );
-	sx127x_write_reg( SX127X_REG_FRF_LSB, ( uint8_t )( frf >> 0 ) );
-}
-
-extern void lora_set_spreading_factor( int sf )
-{
-	if( sf < 6)
-		sf = 6;
-	else if( sf < 12 )
-		sf = 12;
-
-	if( sf == 6 )
-	{
-		sx127x_write_reg( SX127X_REG_DETECTION_OPTIMIZE, 0xC5);
-		sx127x_write_reg( SX127X_REG_DETECTION_THRESHOLD, 0x0C);
-	}
-
-	else
-	{
-		sx127x_write_reg( SX127X_REG_DETECTION_OPTIMIZE, 0xC3);
-		sx127x_write_reg( SX127X_REG_DETECTION_THRESHOLD, 0x0A);
-	}
-
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_2, ( sx127x_read_reg( SX127X_REG_MODEM_CONFIG_2) & 0x0F ) | ( ( sf << 4) & 0xF0 ) );
-}
-
-extern void lora_set_bandwidth( long sbw )
-{
-	uint32_t bw;
-
-	if( sbw <= 7.8E3 )
-		bw = 0;
-	else if( sbw <= 10.4E3 )
-		bw = 1;
-	else if( sbw <= 15.6E3 )
-		bw = 2;
-	else if( sbw <= 20.8E3 )
-		bw = 3;
-	else if( sbw <= 31.25E3 )
-		bw = 4;
-	else if( sbw <= 41.7E3 )
-		bw = 5;
-	else if( sbw <= 62.5E3 )
-		bw = 6;
-	else if( sbw <= 125E3 )
-		bw = 7;
-	else if( sbw <= 250E3 )
-		bw = 8;
-	else
-		bw = 9;
-
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_1, ( sx127x_read_reg( SX127X_REG_MODEM_CONFIG_1 ) & 0x0F ) | ( bw << 4 ) );
-}
-
-extern void lora_set_coding_rate( int denominator )
-{
-	if( denominator < 5)
-		denominator = 5;
-	else if( denominator > 8)
-		denominator = 8;
-
-	uint32_t cr = denominator - 4;
-
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_1, ( sx127x_read_reg( SX127X_REG_MODEM_CONFIG_1 ) & 0xF1 ) | ( cr << 1 ) );
-}
-
-extern void lora_set_preamble_length( long length )
-{
-	sx127x_write_reg( SX127X_REG_PREAMBLE_MSB, ( uint8_t )( length >> 8 ) );
-	sx127x_write_reg( SX127X_REG_PREAMBLE_LSB, ( uint8_t )( length >> 0 ) );
-}
-
-extern void lora_set_sync_word( int sw )
-{
-	sx127x_write_reg( SX127X_REG_SYNC_WORD, sw );
-}
-
-extern void lora_enable_crc( void )
-{
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_2, sx127x_read_reg( SX127X_REG_MODEM_CONFIG_2 | 0x04 ) );
-}
-
-extern void lora_disable_crc( void )
-{
-	sx127x_write_reg( SX127X_REG_MODEM_CONFIG_2, sx127x_read_reg( SX127X_REG_MODEM_CONFIG_2 | 0xFB ) );
-}
-
-extern esp_err_t lora_init( void )
-{
-	esp_err_t ret;
-
-    gpio_config_t io_conf;
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = SX127X_RESET_PIN;
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-
-    spi_config_t spi_config;
-    // Load default interface parameters
-    // CS_EN:1, MISO_EN:1, MOSI_EN:1, BYTE_TX_ORDER:1, BYTE_TX_ORDER:1, BIT_RX_ORDER:0, BIT_TX_ORDER:0, CPHA:0, CPOL:0
-    spi_config.interface.val = SPI_DEFAULT_INTERFACE;
-
-    // Load default interrupt enable
-    // TRANS_DONE: true, WRITE_STATUS: false, READ_STATUS: false, WRITE_BUFFER: false, READ_BUFFER: false
-    spi_config.intr_enable.val = SPI_MASTER_DEFAULT_INTR_ENABLE;
-    // Set SPI to master mode
-    // ESP8266 Only support half-duplex
-    spi_config.mode = SPI_MASTER_MODE;
-    // Set the SPI clock frequency division factor
-    spi_config.clk_div = SPI_10MHz_DIV;
-    spi_config.event_cb = NULL;
-    ret = spi_init(HSPI_HOST, &spi_config);
-
-    assert( ret == ESP_OK);
-
-    lora_reset();
-
-    uint8_t version;
-    uint8_t i = 0;
-
-    while( i++ < TIMEOUT_RESET )
-    {
-    	version = sx127x_read_reg( SX127X_REG_VERSION );
-    	if( version == 0x12 )
-    		break;
-    	vTaskDelay( 2 );
+        // perform reset
+        gpio_set_level( SX127X_RESET_PIN, 0 );
+        vTaskDelay( pdMS_TO_TICKS( 10 ) );
+        gpio_set_level( SX127X_RESET_PIN, 1 );
+        vTaskDelay( pdMS_TO_TICKS( 10 ) );
     }
 
-    assert( i <= TIMEOUT_RESET + 1);
+    /* start SPI */
+    spi_config_t spi_config;
 
+    spi_config.interface.val = SPI_DEFAULT_INTERFACE;
+    spi_config.interface.bit_tx_order = 0;
+    spi_config.interface.byte_tx_order = 1;
+    spi_config.interface.bit_rx_order = 0;
+    spi_config.interface.byte_rx_order = 0;
+
+    spi_config.intr_enable.val = SPI_MASTER_DEFAULT_INTR_ENABLE;
+
+    spi_config.mode = SPI_MASTER_MODE;
+
+    spi_config.clk_div = SPI_8MHz_DIV;
+    spi_config.event_cb = NULL;
+    spi_init(HSPI_HOST, &spi_config);
+
+    /* check version */
+    uint8_t version = read_reg( REG_VERSION );
+    if ( version != 0x12 )
+    	return 0;
+
+    /* put in sleep mode */
     lora_sleep();
-    sx127x_write_reg( SX127X_REG_FIFO_RX_BASE_ADDR, 0 );
-    sx127x_write_reg( SX127X_REG_FIFO_TX_BASE_ADDR, 0 );
-    sx127x_write_reg( SX127X_REG_LNA, sx127x_read_reg( SX127X_REG_LNA ) | 0x03 );
-    sx127x_write_reg( SX127X_REG_MODEM_CONFIG_3, 0x04 );
-    lora_set_tx_power( 17 );
 
+    /* set frequency */
+    lora_set_frequency( frequency );
+
+    /* set base addresses */
+    write_reg( REG_FIFO_TX_BASE_ADDR, 0 );
+    write_reg( REG_FIFO_RX_BASE_ADDR, 0 );
+
+    /* set LNA boost */
+    write_reg( REG_LNA, read_reg( REG_LNA ) | 0x03 );
+
+    /* set auto AGC */
+    write_reg( REG_MODEM_CONFIG_3, 0x04 );
+
+    /* set output power to 17 dBm */
+    lora_set_tx_power( 17, PA_OUTPUT_PA_BOOST_PIN );
+
+    /* put in standby mode */
     lora_idle();
 
-    return ret;
+    return 1;
 }
 
-extern void lora_send_packet( uint8_t *buf, int size ) /* uin8_t o uint32_t? */
+void lora_end()
 {
-	lora_idle();
-	sx127x_write_reg( SX127X_REG_FIFO_ADDR_PTR, 0x00);
-
-	for( uint32_t i = 0; i < size; i++ )
-		sx127x_write_reg( SX127X_REG_FIFO, *buf++);
-
-	sx127x_write_reg( SX127X_REG_PAYLOAD_LENGTH, size );
-
-	sx127x_write_reg( SX127X_REG_OP_MODE, LONG_RANGE_MODE | TX );
-
-	while( ( sx127x_read_reg( SX127X_REG_IRQ_FLAGS ) & TX_DONE_MASK ) == 0 )
-		vTaskDelay( 2 ); // verificar
-
-	sx127x_write_reg( SX127X_REG_IRQ_FLAGS, TX_DONE_MASK );
+  /* put in sleep mode */
+  lora_sleep();
 }
 
-extern int lora_receive_packet( uint8_t *buf, int size )
+int lora_begin_packet( int implicitHeader )
 {
-	int len = 0;
+    if ( is_transmitting() )
+    	return 0;
 
-	int irq = sx127x_read_reg( SX127X_REG_IRQ_FLAGS );
-	sx127x_write_reg( SX127X_REG_IRQ_FLAGS, irq );
+    /* put in standby mode */
+    lora_idle();
 
-	if( ( irq & RX_DONE_MASK ) == 0 )
-		return 0;
-	if( irq & PAYLOAD_CRC_ERROR_MASK )
-			return 0;
+    if ( implicitHeader )
+    	implicit_header_mode();
+    else
+    	explicit_header_mode();
 
-	if( __implicit )
-		len = sx127x_read_reg( SX127X_REG_PAYLOAD_LENGTH );
-	else
-		len = sx127x_read_reg( SX127X_REG_RX_NB_BYTES );
+    /* reset FIFO address and paload length */
+    write_reg( REG_FIFO_ADDR_PTR, 0 );
+    write_reg( REG_PAYLOAD_LENGTH, 0 );
 
-	lora_idle();
-	sx127x_write_reg( SX127X_REG_FIFO_ADDR_PTR, sx127x_read_reg( SX127X_REG_FIFO_RX_CURRENT_ADDR ) );
-	if( len > size )
-		len = size;
-	for( uint32_t i = 0; i < len; i++)
-		*buf++ = sx127x_read_reg( SX127X_REG_FIFO );
-
-	return len;
+    return 1;
 }
 
-extern int lora_received( void )
+int lora_end_packet( bool async )
 {
-	if( sx127x_read_reg( SX127X_REG_IRQ_FLAGS ) & RX_DONE_MASK )
-		return 1;
 
-	return 0;
+    if ( ( async ) && ( __onTxDone ) )
+        write_reg( REG_DIO_MAPPING_1, 0x40 ); // DIO0 => TXDONE
+
+    /* put in TX mode */
+    write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX );
+
+    if ( !async )
+    {
+    	/* wait for TX done */
+        while ( ( read_reg( REG_IRQ_FLAGS ) & IRQ_TX_DONE_MASK ) == 0)
+        	vTaskDelay( pdMS_TO_TICKS( 1 ) );
+
+        /* clear IRQ's */
+        write_reg( REG_IRQ_FLAGS, IRQ_TX_DONE_MASK );
+    }
+
+    return 1;
 }
 
-extern int lora_packet_rssi( void )
+int lora_parsePacket( int size )
 {
-	return ( sx127x_read_reg( SX127X_REG_PKT_RSSI_VALUE ) - ( __frequency < 868E6 ? 164 : 157 ) );
+    int packet_length = 0;
+    int irq_flags = read_reg( REG_IRQ_FLAGS );
+
+    if( size > 0 )
+    {
+        implicit_header_mode();
+        write_reg(REG_PAYLOAD_LENGTH, size & 0xff);
+    }
+    else
+    	explicit_header_mode();
+
+    /* clear IRQ's */
+    write_reg(REG_IRQ_FLAGS, irq_flags);
+
+    if( ( irq_flags & IRQ_RX_DONE_MASK ) && ( irq_flags & IRQ_PAYLOAD_CRC_ERROR_MASK ) == 0)
+    {
+
+		/* received a packet */
+		__packet_index = 0;
+
+		/* read packet length */
+		if ( __implicit_header_mode )
+			packet_length = read_reg( REG_PAYLOAD_LENGTH );
+		else
+			packet_length = read_reg( REG_RX_NB_BYTES );
+
+		/* set FIFO address to current RX address */
+		write_reg( REG_FIFO_ADDR_PTR, read_reg( REG_FIFO_RX_CURRENT_ADDR ) );
+
+		/* put in standby mode */
+		lora_idle();
+    }
+    else if( read_reg( REG_OP_MODE ) != ( MODE_LONG_RANGE_MODE | MODE_RX_SINGLE ) )
+    {
+		/* not currently in RX mode */
+
+		/* reset FIFO address */
+		write_reg( REG_FIFO_ADDR_PTR, 0 );
+
+		// put in single RX mode
+		write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_SINGLE );
+    }
+
+    return packet_length;
 }
 
-extern float lora_packet_snr( void )
+int lora_packet_rssi( void )
 {
-	return ( ( int8_t )sx127x_read_reg( SX127X_REG_PKT_SNR_VALUE ) ) * 0.25;
+    return ( read_reg(REG_PKT_RSSI_VALUE ) - ( __frequency < 868E6 ? 164 : 157 ) );
 }
 
-extern void lora_close( void )
+float lora_packet_snr( void )
 {
-	lora_sleep();
+    return ( ( int8_t )read_reg( REG_PKT_SNR_VALUE ) ) * 0.25;
 }
+/*
+long lora_packetFrequencyError()
+{
+    int32_t freqError = 0;
+    freqError = static_cast<int32_t>(read_reg(REG_FREQ_ERROR_MSB) & B111);
+    freqError <<= 8L;
+    freqError += static_cast<int32_t>(read_reg(REG_FREQ_ERROR_MID));
+    freqError <<= 8L;
+    freqError += static_cast<int32_t>(read_reg(REG_FREQ_ERROR_LSB));
+
+    if (read_reg(REG_FREQ_ERROR_MSB) & B1000) { // Sign bit is on
+        freqError -= 524288; // B1000'0000'0000'0000'0000
+    }
+
+    const float fXtal = 32E6; // FXOSC: crystal oscillator (XTAL) frequency (2.5. Chip Specification, p. 14)
+    const float fError = ((static_cast<float>(freqError) * (1L << 24)) / fXtal) * (getSignalBandwidth() / 500000.0f); // p. 37
+
+    return static_cast<long>(fError);
+}*/
+
+size_t lora_write( const uint8_t *buffer, size_t size )
+{
+	int current_length = read_reg( REG_PAYLOAD_LENGTH );
+
+    /* check size */
+    if( ( current_length + size ) > MAX_PKT_LENGTH )
+    	size = MAX_PKT_LENGTH - current_length;
+
+    /* write data */
+    for ( size_t i = 0; i < size; i++ )
+    	write_reg( REG_FIFO, buffer[ i ] );
+
+    /* update length */
+    write_reg( REG_PAYLOAD_LENGTH, current_length + size );
+
+    return size;
+}
+
+int lora_available( void )
+{
+    return ( read_reg( REG_RX_NB_BYTES ) - __packet_index );
+}
+
+int lora_read( void )
+{
+    if ( !lora_available() )
+    	return -1;
+
+    __packet_index++;
+
+    return read_reg( REG_FIFO );
+}
+
+int lora_peek( void )
+{
+    if ( !lora_available() )
+    	return -1;
+
+    /* store current FIFO address */
+    int current_address = read_reg( REG_FIFO_ADDR_PTR );
+
+    /* read */
+    uint8_t b = read_reg( REG_FIFO );
+
+    /* restore FIFO address */
+    write_reg( REG_FIFO_ADDR_PTR, current_address );
+
+    return b;
+}
+
+void lora_flush( void )
+{
+}
+
+void lora_receive( int size )
+{
+	/* DIO0 => RXDONE */
+    write_reg( REG_DIO_MAPPING_1, 0x00 );
+
+    if ( size > 0 )
+    {
+    	implicit_header_mode();
+        write_reg( REG_PAYLOAD_LENGTH, size & 0xff );
+    }
+    else
+    	explicit_header_mode();
+
+    write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS );
+}
+
+void lora_idle( void )
+{
+    write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY );
+}
+
+void lora_sleep( void )
+{
+    write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP );
+}
+
+void lora_set_tx_power(int level, int output_pin)
+{
+    if( PA_OUTPUT_RFO_PIN == output_pin )
+    {
+		/* RFO */
+		if( level < 0 )
+			level = 0;
+		else if( level > 14 )
+			level = 14;
+
+		write_reg( REG_PA_CONFIG, 0x70 | level );
+    }
+    else
+    {
+        /* PA BOOST */
+        if ( level > 17 )
+        {
+            if ( level > 20 )
+            	level = 20;
+
+            /* subtract 3 from level, so 18 - 20 maps to 15 - 17 */
+            level -= 3;
+
+            /* High Power +20 dBm Operation (Semtech SX1276/77/78/79 5.4.3.) */
+            write_reg( REG_PA_DAC, 0x87 );
+            lora_set_ocp( 140 );
+        }
+        else
+        {
+            if ( level < 2 )
+            	level = 2;
+
+            /* Default value PA_HF/LF or +17dBm */
+            write_reg( REG_PA_DAC, 0x84 );
+            lora_set_ocp( 100 );
+        }
+
+    write_reg( REG_PA_CONFIG, PA_BOOST | ( level - 2 ) );
+    }
+}
+
+void lora_set_frequency( long frequency )
+{
+    __frequency = frequency;
+
+    uint64_t frf = ( ( uint64_t )frequency << 19 ) / 32000000;
+
+    write_reg(REG_FRF_MSB, ( uint8_t )( frf >> 16 ) );
+    write_reg(REG_FRF_MID, ( uint8_t )( frf >> 8 ) );
+    write_reg(REG_FRF_LSB, ( uint8_t )( frf >> 0 ) );
+}
+
+void lora_set_spreading_factor( int sf )
+{
+    if ( sf < 6 )
+    	sf = 6;
+	else if ( sf > 12 )
+		sf = 12;
+
+    if (sf == 6)
+    {
+        write_reg( REG_DETECTION_OPTIMIZE, 0xc5 );
+        write_reg( REG_DETECTION_THRESHOLD, 0x0c );
+    }
+    else
+    {
+        write_reg( REG_DETECTION_OPTIMIZE, 0xc3 );
+        write_reg( REG_DETECTION_THRESHOLD, 0x0a );
+    }
+
+    write_reg( REG_MODEM_CONFIG_2, ( read_reg( REG_MODEM_CONFIG_2 ) & 0x0f ) | ( ( sf << 4 ) & 0xf0 ) );
+    set_ldo_flag();
+}
+
+void lora_set_signal_bandwidth( long sbw )
+{
+    int bw;
+
+    if( sbw <= 7.8E3 )
+    	bw = 0;
+    else if( sbw <= 10.4E3 )
+    	bw = 1;
+    else if( sbw <= 15.6E3 )
+    	bw = 2;
+    else if( sbw <= 20.8E3 )
+    	bw = 3;
+    else if( sbw <= 31.25E3 )
+    	bw = 4;
+    else if( sbw <= 41.7E3 )
+    	bw = 5;
+    else if( sbw <= 62.5E3 )
+    	bw = 6;
+    else if( sbw <= 125E3 )
+    	bw = 7;
+    else if( sbw <= 250E3 )
+    	bw = 8;
+    else
+    	/*if (sbw <= 250E3)*/
+    	bw = 9;
+
+    write_reg( REG_MODEM_CONFIG_1, ( read_reg( REG_MODEM_CONFIG_1 ) & 0x0f ) | ( bw << 4 ) );
+    set_ldo_flag();
+}
+
+void lora_set_coding_rate4( int denominator )
+{
+    if( denominator < 5 )
+    	denominator = 5;
+    else if( denominator > 8 )
+    	denominator = 8;
+
+    int cr = denominator - 4;
+
+    write_reg( REG_MODEM_CONFIG_1, ( read_reg( REG_MODEM_CONFIG_1 ) & 0xf1 ) | ( cr << 1 ) );
+}
+
+void lora_set_preamble_length( long length )
+{
+    write_reg( REG_PREAMBLE_MSB, ( uint8_t )( length >> 8 ) );
+    write_reg( REG_PREAMBLE_LSB, ( uint8_t )( length >> 0 ) );
+}
+
+void lora_set_sync_word( int sw )
+{
+    write_reg( REG_SYNC_WORD, sw );
+}
+
+void lora_enable_crc( void )
+{
+    write_reg( REG_MODEM_CONFIG_2, read_reg( REG_MODEM_CONFIG_2 ) | 0x04 );
+}
+
+void lora_disable_crc( void )
+{
+    write_reg( REG_MODEM_CONFIG_2, read_reg( REG_MODEM_CONFIG_2 ) & 0xfb );
+}
+
+void lora_enable_invert_iq( void )
+{
+    write_reg( REG_INVERTIQ,  0x66 );
+    write_reg( REG_INVERTIQ2, 0x19 );
+}
+
+void lora_disable_invert_iq( void )
+{
+    write_reg( REG_INVERTIQ,  0x27 );
+    write_reg( REG_INVERTIQ2, 0x1d );
+}
+
+void lora_set_ocp(uint8_t current)
+{
+    uint8_t ocp_trim = 27;
+
+    if( current <= 120 )
+    	ocp_trim = ( current - 45 ) / 5;
+    else if( current <=240 )
+    	ocp_trim = ( current + 30 ) / 10;
+
+    write_reg( REG_OCP, 0x20 | ( 0x1F & ocp_trim ) );
+}
+
+uint8_t lora_random( void )
+{
+    return read_reg( REG_RSSI_WIDEBAND );
+}
+
+
+/*
+void lora_handleDio0Rise()
+{
+    int irqFlags = read_reg(REG_IRQ_FLAGS);
+
+    // clear IRQ's
+    write_reg(REG_IRQ_FLAGS, irqFlags);
+
+        if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
+
+        if ((irqFlags & IRQ_RX_DONE_MASK) != 0) {
+            // received a packet
+            __packet_index = 0;
+
+            // read packet length
+            int packetLength = __implicit_header_mode ? read_reg(REG_PAYLOAD_LENGTH) : read_reg(REG_RX_NB_BYTES);
+
+            // set FIFO address to current RX address
+            write_reg(REG_FIFO_ADDR_PTR, read_reg(REG_FIFO_RX_CURRENT_ADDR));
+
+            if (_onReceive) {
+                _onReceive(packetLength);
+            }
+        }
+        else if ((irqFlags & IRQ_TX_DONE_MASK) != 0) {
+            if (_onTxDone) {
+                _onTxDone();
+            }
+        }
+    }
+}*/
 
 /*==================[internal functions definition]==========================*/
 
-static void spi_transmit( spi_master_mode_t trans_mode, uint32_t data, uint32_t addr )
+static void write_reg( uint8_t reg, uint8_t value )
 {
 	spi_trans_t trans;
-	uint16_t cmd;
+	uint32_t addr_buf = (uint32_t)( ( reg | 0x80 ) << 24);
+	uint32_t mosi_buf = (uint32_t)( value << 24 );
 
 	memset( &trans, 0x00, sizeof( trans ) );
 	trans.bits.val = 0;
 
-	if( trans_mode == SPI_SEND )
-	{
-		cmd = SPI_MASTER_WRITE_DATA_TO_SLAVE_CMD;
-		trans.bits.mosi = 8;
-		trans.mosi = &data;
-	}
+	trans.bits.mosi = 8;
+	trans.mosi = &mosi_buf;
 
-	else
-	{
-		cmd = SPI_MASTER_READ_DATA_FROM_SLAVE_CMD;
-		trans.bits.miso = 8;
-		trans.miso = &data;
-	}
-
-	trans.bits.cmd = 8;
 	trans.bits.addr = 8;
-	trans.cmd = &cmd;
-	trans.addr = &addr;
+	trans.addr = &addr_buf;
 
-	spi_trans( HSPI_HOST, &trans );
+	ESP_ERROR_CHECK( spi_trans( HSPI_HOST, &trans ) );
 }
 
-static void sx127x_write_reg( uint32_t reg, uint32_t value )
+static uint8_t read_reg( uint8_t reg )
 {
-	spi_transmit( SPI_SEND, value, reg  );
+	uint32_t value = 0x0;
+	uint32_t addr_buf = (uint32_t)( ( reg & 0x7F ) << 24 );
+	spi_trans_t trans;
+
+	memset( &trans, 0x00, sizeof( trans ) );
+	trans.bits.val = 0;
+
+	trans.bits.miso = 8;
+	trans.miso = &value;
+
+	trans.bits.addr = 8;
+	trans.addr = &addr_buf;
+
+	ESP_ERROR_CHECK( spi_trans( HSPI_HOST, &trans ) );
+	return ( uint8_t )( value );
 }
 
-static uint32_t sx127x_read_reg( uint32_t reg )
+static void explicit_header_mode( void )
 {
-	uint32_t value = 0x00;
+    __implicit_header_mode = 0;
 
-	spi_transmit( SPI_RECV, value, reg  );
+    write_reg( REG_MODEM_CONFIG_1, read_reg( REG_MODEM_CONFIG_1 ) & 0xfe );
+}
 
-	return value;
+static void implicit_header_mode( void )
+{
+    __implicit_header_mode = 1;
+
+    write_reg( REG_MODEM_CONFIG_1, read_reg( REG_MODEM_CONFIG_1 ) | 0x01 );
+}
+
+static bool is_transmitting( void )
+{
+    if ( ( read_reg( REG_OP_MODE ) & MODE_TX ) == MODE_TX )
+    	return true;
+
+    if ( read_reg( REG_IRQ_FLAGS ) & IRQ_TX_DONE_MASK )
+    	// clear IRQ's
+        write_reg( REG_IRQ_FLAGS, IRQ_TX_DONE_MASK );
+
+    return false;
+}
+
+static int get_spreading_factor( void )
+{
+    return read_reg( REG_MODEM_CONFIG_2 ) >> 4;
+}
+
+static long get_signal_bandwidth( void )
+{
+    uint8_t bw = ( read_reg( REG_MODEM_CONFIG_1 ) >> 4 );
+
+    switch ( bw )
+    {
+        case 0:
+        	return 7.8E3;
+
+        case 1:
+        	return 10.4E3;
+
+        case 2:
+        	return 15.6E3;
+
+        case 3:
+        	return 20.8E3;
+
+        case 4:
+        	return 31.25E3;
+
+        case 5:
+        	return 41.7E3;
+
+        case 6:
+        	return 62.5E3;
+
+        case 7:
+        	return 125E3;
+
+        case 8:
+        	return 250E3;
+
+        case 9:
+        	return 500E3;
+    }
+
+    return -1;
+}
+
+static void set_ldo_flag( void )
+{
+    /* Section 4.1.1.5 */
+    long symbol_duration = 1000 / ( get_signal_bandwidth() / ( 1L << get_spreading_factor() ) ) ;
+
+    /* Section 4.1.1.6 */
+    bool ldo_on = symbol_duration > 16;
+
+    uint8_t config3 = read_reg( REG_MODEM_CONFIG_3 );
+
+    if( ldo_on )
+    	config3 |= 0x80;
+    else
+    	config3 &= 0x7F;
+
+    write_reg( REG_MODEM_CONFIG_3, config3 );
 }
 
 /*==================[end of file]============================================*/

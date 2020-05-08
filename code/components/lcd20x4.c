@@ -51,18 +51,14 @@ static const hd44780_font_t lcd_font = HD44780_FONT_5X8;
 
 /*==================[internal functions declaration]=========================*/
 
-//static esp_err_t i2c_init();
-static esp_err_t pcf8574_write( i2c_port_t i2c_num, uint8_t data );
+static esp_err_t pcf8574_write( uint8_t data );
 static void hd44780_write_nibble( uint8_t byte, bool rs, bool bl );
 static void hd44780_write_byte( uint8_t byte, bool rs, bool bl );
 
 /*==================[external functions definition]=========================*/
 
-extern void lcd_init( void )
+void lcd_init( void )
 {
-	// i2c initialization
-	//i2c_init();
-
     // switch to 4 bit mode
     for ( uint8_t i = 0; i < 3; i ++ )
     {
@@ -89,7 +85,7 @@ extern void lcd_init( void )
     lcd_control( true, false, false );
 }
 
-extern void lcd_control( bool on, bool cursor, bool cursor_blink )
+void lcd_control( bool on, bool cursor, bool cursor_blink )
 {
 	hd44780_write_byte( CMD_DISPLAY_CTRL |
 						( on ? ARG_DC_DISPLAY_ON : 0) |
@@ -98,25 +94,25 @@ extern void lcd_control( bool on, bool cursor, bool cursor_blink )
     short_delay();
 }
 
-extern void lcd_clear( void )
+void lcd_clear( void )
 {
 	hd44780_write_byte( CMD_CLEAR, false, true );
 	long_delay();
 }
 
-extern void lcd_gotoxy( uint8_t col, uint8_t line)
+void lcd_gotoxy( uint8_t col, uint8_t line)
 {
 	hd44780_write_byte( CMD_DDRAM_ADDR + line_addr[line - 1] + col - 1, false, true );
     short_delay();
 }
 
-extern void lcd_putc( char character )
+void lcd_putc( char character )
 {
 	hd44780_write_byte( character, true, true );
     short_delay();
 }
 
-extern void lcd_puts( const char * string )
+void lcd_puts( const char * string )
 {
     while ( * string )
     {
@@ -127,34 +123,11 @@ extern void lcd_puts( const char * string )
 
 /*==================[internal functions definition]=========================*/
 
-/*static esp_err_t i2c_init()
-{
-    int i2c_master_port = I2C_MASTER_NUM;
-    i2c_config_t conf;
-
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_IO;
-    conf.sda_pullup_en = 1;
-    conf.scl_io_num = I2C_MASTER_SCL_IO;
-    conf.scl_pullup_en = 1;
-    conf.clk_stretch_tick = 300; // 300 ticks, Clock stretch is about 210us, you can make changes according to the actual situation.
-    //ESP_ERROR_CHECK( i2c_driver_delete( i2c_master_port ) );
-    ESP_ERROR_CHECK( i2c_driver_install( i2c_master_port, conf.mode ) );
-    ESP_ERROR_CHECK( i2c_param_config( i2c_master_port, &conf ));
-
-    return ESP_OK;
-}*/
-
-static esp_err_t pcf8574_write( i2c_port_t i2c_num, uint8_t data )
+static esp_err_t pcf8574_write( uint8_t data )
 {
 	int ret;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, PCF8574_ADDR << 1 | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, data, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
+
+	ret = i2c_write_reg0( PCF8574_ADDR, &data, 1 );
 
     return ret;
 }
@@ -168,10 +141,10 @@ static void hd44780_write_nibble( uint8_t byte, bool rs, bool bl )
 				   ( rs ? 1 : 0 ) |
 				   ( bl ? 1 << 3 : 0);
     //CHECK(lcd->write_cb(data | (1 << lcd->pins.e)));
-	pcf8574_write( I2C_MASTER_NUM, data | 1 << 2 );
+	pcf8574_write( data | 1 << 2 );
     toggle_delay();
     //CHECK(lcd->write_cb(data));
-    pcf8574_write( I2C_MASTER_NUM, data );
+    pcf8574_write( data );
 }
 
 static void hd44780_write_byte( uint8_t byte, bool rs, bool bl )

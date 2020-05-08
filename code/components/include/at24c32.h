@@ -43,6 +43,7 @@
 #include "driver/i2c.h"
 #include "esp_err.h"
 #include "rom/ets_sys.h"
+#include "i2c_conf.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -51,29 +52,10 @@ extern "C" {
 #endif
 
 /*==================[macros]=================================================*/
-#ifndef I2C_MASTER_SCL_IO
-#define I2C_MASTER_SCL_IO			2                /* gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO           0               /* gpio number for I2C master data  */
-#define I2C_MASTER_NUM              I2C_NUM_0        /* I2C port number for master dev */
-#define I2C_MASTER_TX_BUF_DISABLE   0                /* I2C master do not need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0                /* I2C master do not need buffer */
-#endif
 
-#ifndef WRITE_BIT
-#define WRITE_BIT                   I2C_MASTER_WRITE /* I2C master write */
-#define READ_BIT                    I2C_MASTER_READ  /* I2C master read */
-#define ACK_CHECK_EN                0x1              /* I2C master will check ack from slave*/
-#define ACK_CHECK_DIS               0x0              /* I2C master will not check ack from slave */
-#define ACK_VAL                     0x0              /* I2C ack value */
-#define NACK_VAL                    0x1              /* I2C nack value */
-#define LAST_NACK_VAL               0x2              /* I2C last_nack value */
-#endif
-
-#define AT24C32_ADDR				0x57             /* slave address for AT24C32 EEPROM */
-
-#define MS							1000
-#define DELAY			  			( 5 * MS ) // >1.53ms according to datasheet
-#define write_cycle_delay()			do { ets_delay_us( DELAY ); } while ( 0 )
+#define AT24C32_ADDR			0x57	// slave address for AT24C32 EEPROM
+#define EEPROM_SIZE				4096	// EEPROM size in bytes (32Kbits)
+#define EEPROM_INITIAL_ADDRESS	0x0		// EEPROM initial addres
 
 /*==================[typedef]================================================*/
 
@@ -81,11 +63,83 @@ extern "C" {
 
 /*==================[external functions declaration]=========================*/
 
-extern esp_err_t i2c_init( void );
-extern esp_err_t at24c32_write( uint16_t reg_address, uint8_t * data );
-extern esp_err_t at24c32_page_write( uint16_t reg_address, uint8_t * data, size_t data_len );
-extern esp_err_t at24c32_read( uint16_t reg_address, uint8_t * data );
-//extern esp_err_t at24c32_sequential_read( i2c_port_t i2c_num, uint16_t reg_address, uint8_t * data, size_t data_len );
+/**
+ * @brief Function to read a 8-bit value of an EEPROM address
+ *
+ * @param address[in] EEPROM address to be read
+ * @param data[out] Pointer to varible that stores the 8-bit value to be read
+ * 					of the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_read8( uint16_t address, uint8_t *data );
+
+/**
+ * @brief Function to read a 16-bit value of an EEPROM address
+ *
+ * @param address[in] EEPROM address to be read
+ * @param data[out] Pointer to varible that stores the 16-bit value to be read
+ * 					of the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_read16( uint16_t address, uint16_t *data );
+
+/**
+ * @brief Function to read a 32-bit value of an EEPROM address
+ *
+ * @param address[in] EEPROM address to be read
+ * @param data[out] Pointer to varible that stores the 32-bit value to be read
+ * 					of the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_read32( uint16_t address, uint32_t *data );
+
+/**
+ * @brief Function to write a 8-bit value to an EEPROM address
+ *
+ * @param address[in] EEPROM address to be written
+ * @param data[in] Pointer to varible that stores the 8-bit value to be written
+ * 				   in the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_write8( uint16_t address, uint8_t *data );
+
+/**
+ * @brief Function to write a 16-bit value to an EEPROM address
+ *
+ * @param address[in] EEPROM address to be written
+ * @param data[in] Pointer to varible that stores the 16-bit value to be written
+ * 				   in the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_write16( uint16_t address, uint16_t *data );
+
+/**
+ * @brief Function to write a 32-bit value to an EEPROM address
+ *
+ * @param address[in] EEPROM address to be written
+ * @param data[in] Pointer to varible that stores the 32-bit value to be written
+ * 				   in the EEPROM
+ *
+ * @return
+ * 		- true Parameters whithin range
+ * 		- false Parameters out of range
+ */
+uint8_t at24c32_write32( uint16_t address, uint32_t *data );
 
 /*==================[cplusplus]==============================================*/
 
