@@ -11,7 +11,7 @@
 
 # Example project files
 /sdkconfig
-/sdkconfig
+/sdkconfig.old
 /build
 
 # emacs
