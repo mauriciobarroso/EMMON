@@ -51,9 +51,7 @@ static void alarm_task( void * pvParameters );
 /*==================[external functions definition]=========================*/
 
 
-void data_logger_init( data_logger_t * const me )
-{
-
+void data_logger_init ( data_logger_t * const me ) {
 	/* se inicializa i2c interface */
 	i2c_init();
 

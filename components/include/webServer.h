@@ -43,9 +43,6 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define STA_WIFI_SSID		"CASAwifi"
-#define STA_WIFI_PASS		"orcobebe"
-
 #define AP_WIFI_SSID		"EMMON"
 #define AP_WIFI_PASS		"123456789"
 #define AP_MAX_STA_CONN		10

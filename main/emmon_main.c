@@ -33,13 +33,11 @@ data_logger_t data_logger;
 
 /*========================[main]=============================================*/
 
-void app_main()
+void app_main ()
 {
 	web_interface_init();
-	data_logger_init( &data_logger );
-	data_transmission_init( &data_logger.transmission );
-
-    /* el scheduler es iniciado en las tareas de inicialización del esp8266 */
+	data_logger_init ( &data_logger );
+	data_transmission_init ( &data_logger.transmission );
 }
 
 /*==================[function definition ]================================================*/
