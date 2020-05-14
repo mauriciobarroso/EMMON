@@ -35,9 +35,9 @@ data_logger_t data_logger;
 
 void app_main ()
 {
-	web_interface_init();
-	data_logger_init ( &data_logger );
+	//web_interface_init();
 	data_transmission_init ( &data_logger.transmission );
+	data_logger_init ( &data_logger );
 }
 
 /*==================[function definition ]================================================*/

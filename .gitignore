@@ -13,6 +13,7 @@
 /sdkconfig
 /sdkconfig.old
 /build
+/notes
 
 # emacs
 .dir-locals.el

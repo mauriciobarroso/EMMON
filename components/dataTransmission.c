@@ -39,6 +39,8 @@
 
 /*==================[macros]=================================================*/
 
+#define MAX_TX_PACKET_LEN	14
+
 /*==================[typedef]================================================*/
 
 /*==================[internal data declaration]==============================*/
@@ -48,8 +50,8 @@
 /*==================[internal functions declaration]=========================*/
 
 static const char * TAG = "data_transmission";
-static void send_to_network( void * pvParameters );
-//static void check_network_status( void * pvParameters );
+static void send_to_network( void * arg );
+//static void check_network_status( void * arg );
 
 /*==================[external functions definition]=========================*/
 
@@ -64,10 +66,10 @@ void data_transmission_init( data_transmission_t * const me )
 
 /*==================[internal functions definition]==========================*/
 
-static void send_to_network( void * pvParameters )
+static void send_to_network( void * arg )
 {
-	data_transmission_t * data_transmission = ( data_transmission_t * )pvParameters;
-	char buffer[ 255 ];
+	data_transmission_t * data_transmission = ( data_transmission_t * )arg;
+	char buffer[ MAX_TX_PACKET_LEN ];
 	data_transmission_packet_t packet;
 
 	for( ;; )
@@ -83,13 +85,13 @@ static void send_to_network( void * pvParameters )
 
 		/* send to LoRa network */
 		lora_begin_packet( false );
-		lora_write( ( const uint8_t * )buffer, 14 );
+		lora_write( ( const uint8_t * )buffer, MAX_TX_PACKET_LEN );
 		lora_end_packet( false );
 	}
 }
 
 /*
-static void check_network_status( void * pvParameters )
+static void check_network_status( void * arg )
 {
 	for( ;; )
 	{
