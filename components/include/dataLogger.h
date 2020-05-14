@@ -37,7 +37,7 @@ extern "C" {
 /*==================[macros]=================================================*/
 
 /*  debug mode*/
-#define DEBUG_MODE
+#define DEBUG_MESSAGES
 
 /* definicion de pines de interrupcion */
 #define GPIO_PULSES			0	/*!< pulses interrupt pin */
