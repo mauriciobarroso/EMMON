@@ -12,7 +12,7 @@
 /*==================[macros]=================================================*/
 
 /* mask to configure interrupt pins */
-#define INTERRUPT_PINS_MASK	( ( 1ULL << GPIO_PULSES ) | ( 1ULL << GPIO_ALARM ) )	/*!< data logger mask pin */
+#define DATA_LOGGER_PINS_MASK		( ( 1ULL << GPIO_PULSES ) | ( 1ULL << GPIO_ALARM ) )	/*!< data logger mask pins */
 
 /* addresses */
 #define DEVICE_SETTINGS_ADDR		0x0		/*!< direccion en la eeprom donde se guarda los device settings */
@@ -23,8 +23,8 @@
 #define	MONTHLY_LOGGED_DAYS_ADDR	0x24	/*!< dirección en la eeprom donde se guarda la cantidad de dias monitoreados */
 
 /* values */
-#define BASE_INDEX					0x30	/*!< índice base para el guardado de pulsos */
-#define DATA_SIZE					5		/*!< tamaño en Bytes de los datos guardados en la EEPROM */
+#define BASE_INDEX					0x30	/*!< índice base para el almacenamiento de pulsos */
+#define DATA_SIZE					5		/*!< tamaño en bytes de los datos guardados(pulsos diarios y fecha) en la EEPROM */
 
 /*==================[typedef]================================================*/
 
@@ -41,80 +41,54 @@ static TaskHandle_t pulses_handle, alarm_handle;
 /*==================[internal functions declaration]=========================*/
 
 /* isr handlers */
-static void IRAM_ATTR alarm_isr( void *pvParameters );
-static void IRAM_ATTR pulses_isr( void *pvParameters );
+static void IRAM_ATTR pulses_isr( void * arg );
+static void IRAM_ATTR alarm_isr( void * arg );
 
 /* function tasks */
-static void pulses_task( void * pvParameters );
-static void alarm_task( void * pvParameters );
+static void pulses_task( void * arg );
+static void alarm_task( void * arg );
 
 /*==================[external functions definition]=========================*/
 
-
-void data_logger_init ( data_logger_t * const me ) {
-	/* se inicializa i2c interface */
+void data_logger_init( data_logger_t * const me )
+{
+	/* se inicializa la interfaz i2c */
 	i2c_init();
 
-	ds3231_clear_alarm_flag( 1 );
+//	uint8_t data = 0;
+//	for( uint8_t i = 0; i < 0xFF; i++ )
+//		at24c32_write8( i, &data );
 
-	/* reset
-	uint8_t data = 0;
-	for( uint8_t i = 0; i < 0xFF; i++ )
-		at24c32_write8( i, &data );
-
-	me->rtc.date.date= 0x8;
-	me->rtc.date.month = 0x5;
-	me->rtc.date.year = 0x20;
-	ds3231_set_date( &me->rtc );*/
-
-	/* inicialización de la variable para el índice de conteo de pulsos */
+	/* se inicializa la variable para el índice de conteo de pulsos */
 	at24c32_read16( CURRENT_INDEX_ADDR, &me->index );
 	if( me->index < BASE_INDEX || me->index == 0xFFFF )
 		me->index = BASE_INDEX;
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "index:0x%X", me->index );
-	#endif
 
-	/* inicialización de la variable para el conteo de pulsos */
+	/* se inicializa la variable para el conteo de pulsos */
 	at24c32_read16( me->index, &me->daily_pulses );
 	if( me->daily_pulses == 0xFFFF )
 		me->daily_pulses = 0;
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "daily_pulses:%d", me->daily_pulses );
-	#endif
 
-	/* inicialización de la variable para el conteo de días monitoreados */
+	/* se inicializa la variable para el conteo total de días monitoreados */
 	at24c32_read16( TOTAL_LOGGED_DAYS_ADDR, &me->total_logged_days );
-	if( me->total_logged_days == 0xFF )
+	if( me->total_logged_days == 0xFFFF )
 		me->total_logged_days = 0;
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "total_logged_days:%d", me->total_logged_days );
-	#endif
 
-	/* inicialización de la variable para el conteo de días monitoreados */
+	/* se inicializa la variable para el conteo mensual de días monitoreados */
 	at24c32_read16( MONTHLY_LOGGED_DAYS_ADDR, &me->monthly_logged_days );
-	if( me->monthly_logged_days == 0xFF )
+	if( me->monthly_logged_days == 0xFFFF )
 		me->monthly_logged_days = 0;
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "monthly_logged_days:%d", me->monthly_logged_days );
-	#endif
 
-	/* se inicializala variable para el ID del usuario */
+	/* se inicializa la variable para el ID del usuario */
 	at24c32_read32( USER_ID_ADDR, &me->id );
 	if( me->id == 0x0 || me->id == 0xFFFFFFFF )
 		me->id = 0x12345678;
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "user:%X", me->id );
-	#endif
 
-	/* se obtiene la hora y fecha del RTC */
+	/* se obtiene la hora y fecha del RTC y se almacena en la eeprom */
 	ds3231_get_date( &me->rtc );
 	at24c32_write8( me->index + 2, &me->rtc.date.date );
 	at24c32_write8( me->index + 3, &me->rtc.date.month );
 	at24c32_write8( me->index + 4, &me->rtc.date.year );
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "date:%02x/%02x/%02x", me->rtc.date.date, me->rtc.date.month, me->rtc.date.year );
-	#endif
 
 	/* se configura la alarma 1 del RTC */
 	me->rtc.alarm1.seconds = 0x0;
@@ -126,8 +100,7 @@ void data_logger_init ( data_logger_t * const me ) {
 	me->rtc.alarm_interrupt_mode = ENABLE_ALARM1;
 	ds3231_set_alarm_interrupt( &me->rtc );
 
-
-	/* se inicializala variable para el ID del usuario */
+	/* se inicializa la variable para el conteo mensual de pulsos */
 	me->monthly_pulses = 0;
 	uint16_t pulses;
 	for( uint16_t i = me->index; i >= ( me->index - ( DATA_SIZE * me->monthly_logged_days ) ); i -= DATA_SIZE )
@@ -135,15 +108,13 @@ void data_logger_init ( data_logger_t * const me ) {
 		at24c32_read16( i, &pulses );
 		me->monthly_pulses += pulses;
 	}
-	#ifdef DEBUG_MODE
-		ESP_LOGI( TAG, "monthly_pulses:%d", me->monthly_pulses );
-	#endif
 
-	/* se inicializan los configuración de interrupciones */
+	/* se configuran los GPIO */
+	ESP_LOGI( TAG, "gpios configuration" );
 	gpio_config_t gpio_conf;
-	gpio_conf.pin_bit_mask = INTERRUPT_PINS_MASK;
+	gpio_conf.pin_bit_mask = DATA_LOGGER_PINS_MASK;
 	gpio_conf.mode = GPIO_MODE_INPUT;
-	gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+	gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;		/* habilitar si fisicamente no hay resistencias de pull-up */
 	gpio_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
 	gpio_conf.intr_type = GPIO_INTR_NEGEDGE;
 	gpio_config( &gpio_conf );
@@ -154,33 +125,48 @@ void data_logger_init ( data_logger_t * const me ) {
 	gpio_isr_handler_add( GPIO_ALARM, alarm_isr, NULL );
 
 	/* se crean las tareas */
-	xTaskCreate( pulses_task, "Pulse Count Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 2, &pulses_handle );
-	xTaskCreate( alarm_task, "Send Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 2, &alarm_handle );
+	xTaskCreate( pulses_task, "Pulses Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 3, &pulses_handle );	/* tarea para el conteo de pulsos */
+	xTaskCreate( alarm_task, "Alarm Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 2, &alarm_handle );		/* tarea para ejecutar las acciones cuadno ocurre la alarma */
 
+	/* se consulta si la alarma está activa y se notifica a la tarea encargada */
+	if( ds3231_get_alarm_flag( 1 ) )
+		xTaskNotifyGive( alarm_handle );
+
+	/* se imprime si debug mode esta definido */
+	#ifdef DEBUG_MESSAGES
+		ESP_LOGI( TAG, "index:0x%X", me->index );
+		ESP_LOGI( TAG, "daily pulses:%d", me->daily_pulses );
+		ESP_LOGI( TAG, "total logged days:%d", me->total_logged_days );
+		ESP_LOGI( TAG, "monthly logged days:%d", me->monthly_logged_days );
+		ESP_LOGI( TAG, "user:%X", me->id );
+		ESP_LOGI( TAG, "date:%02x/%02x/%02x", me->rtc.date.date, me->rtc.date.month, me->rtc.date.year );
+		ESP_LOGI( TAG, "monthly_pulses:%d", me->monthly_pulses );
+	#endif
 }
 
 /*==================[internal functions definition]==========================*/
 
-/* interrupt service routine for incoming RTC alarm */
-static void IRAM_ATTR alarm_isr( void *pvParameters )
-{
-	BaseType_t higher_priority_task_woken = pdFALSE;
-	vTaskNotifyGiveFromISR( alarm_handle, &higher_priority_task_woken );
-	portEND_SWITCHING_ISR( higher_priority_task_woken );
-}
-
 /* interrupt service routine for incoming digital pulses */
-static void IRAM_ATTR pulses_isr( void *pvParameters )
+static void IRAM_ATTR pulses_isr( void *arg )
 {
 	BaseType_t higher_priority_task_woken = pdFALSE;
 	vTaskNotifyGiveFromISR( pulses_handle, &higher_priority_task_woken );
 	portEND_SWITCHING_ISR( higher_priority_task_woken );
 }
 
-static void pulses_task( void * pvParameters )
+/* interrupt service routine for incoming RTC alarm */
+static void IRAM_ATTR alarm_isr( void *arg )
+{
+	BaseType_t higher_priority_task_woken = pdFALSE;
+	vTaskNotifyGiveFromISR( alarm_handle, &higher_priority_task_woken );
+	portEND_SWITCHING_ISR( higher_priority_task_woken );
+}
+
+
+static void pulses_task( void * arg )
 {
 	uint32_t event_to_process;
-	data_logger_t * data_logger = ( data_logger_t * )pvParameters;
+	data_logger_t * data_logger = ( data_logger_t * )arg;
 
 	for( ;; )
 	{
@@ -189,13 +175,16 @@ static void pulses_task( void * pvParameters )
 
 		if( event_to_process != 0 )
 		{
+			/* se abre sección crítica */
+			taskENTER_CRITICAL();
+
 			/* se aumenta en 1 el conteo de pulsos y se guarda en la EEPROM*/
 			data_logger->daily_pulses++;
-			data_logger->monthly_pulses++;
 			at24c32_write16( data_logger->index, &data_logger->daily_pulses );
+			data_logger->monthly_pulses++;
 
 			ESP_LOGI( TAG, "[0x%X]=%d", data_logger->index, data_logger->daily_pulses );
-			ESP_LOGI( TAG, "pulses_monthly=%d", data_logger->monthly_pulses );
+			ESP_LOGI( TAG, "monthly pulses=%d", data_logger->monthly_pulses );
 
 			FILE* f = NULL;
 			f = fopen( "/spiffs/pulses.txt", "w" );
@@ -204,14 +193,17 @@ static void pulses_task( void * pvParameters )
 				fprintf( f, "%d", data_logger->daily_pulses );
 				fclose( f );
 			}
+
+			/* se cierra sección crítica */
+			taskEXIT_CRITICAL();
 		}
 	}
 }
 
-static void alarm_task( void * pvParameters )
+static void alarm_task( void * arg )
 {
 	uint32_t event_to_process;
-	data_logger_t * data_logger = ( data_logger_t * )pvParameters;
+	data_logger_t * data_logger = ( data_logger_t * )arg;
 
 	for( ;; )
 	{
@@ -222,40 +214,43 @@ static void alarm_task( void * pvParameters )
 		{
 			ESP_LOGI( TAG, "Alarm!" );
 
-			// seccion critica
-			/* se constuye el paquete a encolar */
+			/* se abre sección crítica */
+			taskENTER_CRITICAL();
+
+			/* se constuye el paquete y se manda  a la cola de Data Transmission */
 			data_logger->transmission.packet.pulses = data_logger->daily_pulses;
 			data_logger->transmission.packet.id = data_logger->id;
-			// seccion critica
 			xQueueSend( data_logger->transmission.queue, &data_logger->transmission, 0 );
 
-			/* se aumenta en 1 el conteo de dias monitoreados y se guarda en la eeprom*/
+			/* se aumenta en 1 el conteo total de dias monitoreados y se guarda en la eeprom */
 			data_logger->total_logged_days++;
 			at24c32_write16( TOTAL_LOGGED_DAYS_ADDR, &data_logger->total_logged_days );
-			ESP_LOGI( TAG, "total:%d", data_logger->total_logged_days );
+			ESP_LOGI( TAG, "total logged days:%d", data_logger->total_logged_days );
 
-			/* se aumenta en 1 el conteo de dias monitoreados y se guarda en la eeprom*/
+			/* se aumenta en 1 el conteo mensual de dias monitoreados y se guarda en la eeprom*/
 			data_logger->monthly_logged_days++;
 			at24c32_write16( MONTHLY_LOGGED_DAYS_ADDR, &data_logger->monthly_logged_days );
-			ESP_LOGI( TAG, "monthly:%d", data_logger->monthly_logged_days );
+			ESP_LOGI( TAG, "monthly logged days:%d", data_logger->monthly_logged_days );
 
-			/* se aumenta el indice la cantidad del tamaño de los datos y se guarda en la eeprom */
+			/* se aumenta el indice en DATA_SIZE y se guarda en la eeprom */
 			data_logger->index += DATA_SIZE;
 			if( data_logger->index > ( 0xFFF - DATA_SIZE ) )
 				data_logger->index = BASE_INDEX;
 			at24c32_write16( CURRENT_INDEX_ADDR, &data_logger->index );
 
-			/* se pone en 0 el conteo de pulsos y se guarda en la memoria eeprom */
+			/* se pone en 0 el conteo diario de pulsos y se guarda en la memoria eeprom */
 			data_logger->daily_pulses = 0;
 			at24c32_write16( data_logger->index, &data_logger->daily_pulses );
 
 			/* se obtiene la nueva fecha y se guarda en la eeprom*/
-			uint8_t current_month = data_logger->rtc.date.month;
+			uint8_t current_month = data_logger->rtc.date.month; /* se guarda el mes actual antes de obtener el nuevo mes del ds3231 */
 			ds3231_get_date( &data_logger->rtc );
 			at24c32_write8( data_logger->index + 2, &data_logger->rtc.date.date );
 			at24c32_write8( data_logger->index + 3, &data_logger->rtc.date.month );
 			at24c32_write8( data_logger->index + 4, &data_logger->rtc.date.year );
-			ESP_LOGI( TAG, "current:%02x new:%02x", current_month, data_logger->rtc.date.month );
+			ESP_LOGI( TAG, "current month:%02x new month:%02x", current_month, data_logger->rtc.date.month );
+
+			/* se compara el mes obtenido con el actual */
 			if( current_month != data_logger->rtc.date.month )
 			{
 				data_logger->monthly_logged_days = 0;
@@ -263,12 +258,14 @@ static void alarm_task( void * pvParameters )
 				data_logger->monthly_pulses = 0;
 			}
 
+			/* se cierra sección crítica */
+			taskEXIT_CRITICAL();
+
 			/* se borra el flag de la alarma */
-			ESP_LOGI( TAG, "clear" );
 			ds3231_clear_alarm_flag( 1 );
+			ESP_LOGI( TAG, "clear alarm1 flag" );
 		}
 	}
 }
-
 
 /*==================[end of file]============================================*/
