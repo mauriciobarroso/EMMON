@@ -33,8 +33,8 @@
 
 /* Date: 10/12/19 */
 
-#ifndef _AT24C32_H_
-#define _AT24C32_H_
+#ifndef _AT24CX_H_
+#define _AT24CX_H_
 
 /*==================[inclusions]=============================================*/
 
@@ -53,8 +53,8 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define AT24C32_ADDR			0x57	// slave address for AT24C32 EEPROM
-#define EEPROM_SIZE				4096	// EEPROM size in bytes (32Kbits)
+#define at24cx_ADDR			0x57	// device address for at24cxx
+#define EEPROM_SIZE				0x90	// EEPROM size in bytes (32Kbits)
 #define EEPROM_INITIAL_ADDRESS	0x0		// EEPROM initial addres
 
 /*==================[typedef]================================================*/
@@ -74,7 +74,7 @@ extern "C" {
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_read8( uint16_t address, uint8_t *data );
+uint8_t at24cx_read8( uint16_t address, uint8_t * data );
 
 /**
  * @brief Function to read a 16-bit value of an EEPROM address
@@ -87,7 +87,7 @@ uint8_t at24c32_read8( uint16_t address, uint8_t *data );
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_read16( uint16_t address, uint16_t *data );
+uint8_t at24cx_read16( uint16_t address, uint16_t * data );
 
 /**
  * @brief Function to read a 32-bit value of an EEPROM address
@@ -100,7 +100,7 @@ uint8_t at24c32_read16( uint16_t address, uint16_t *data );
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_read32( uint16_t address, uint32_t *data );
+uint8_t at24cx_read32( uint16_t address, uint32_t * data );
 
 /**
  * @brief Function to write a 8-bit value to an EEPROM address
@@ -113,7 +113,7 @@ uint8_t at24c32_read32( uint16_t address, uint32_t *data );
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_write8( uint16_t address, uint8_t *data );
+uint8_t at24cx_write8( uint16_t address, uint8_t * data );
 
 /**
  * @brief Function to write a 16-bit value to an EEPROM address
@@ -126,7 +126,7 @@ uint8_t at24c32_write8( uint16_t address, uint8_t *data );
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_write16( uint16_t address, uint16_t *data );
+uint8_t at24cx_write16( uint16_t address, uint16_t * data );
 
 /**
  * @brief Function to write a 32-bit value to an EEPROM address
@@ -139,7 +139,7 @@ uint8_t at24c32_write16( uint16_t address, uint16_t *data );
  * 		- true Parameters whithin range
  * 		- false Parameters out of range
  */
-uint8_t at24c32_write32( uint16_t address, uint32_t *data );
+uint8_t at24cx_write32( uint16_t address, uint32_t * data );
 
 /*==================[cplusplus]==============================================*/
 
@@ -150,4 +150,4 @@ uint8_t at24c32_write32( uint16_t address, uint32_t *data );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _AT24C32_H_ */
+#endif /* #ifndef _AT24CX_H_ */
