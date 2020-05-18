@@ -69,7 +69,7 @@ extern "C" {
 #define LAST_NACK_VAL               0x2              /* I2C last_nack value */
 
 #define MS							1000
-#define DELAY			  			( 5 * MS ) // >1.53ms according to datasheet
+#define DELAY			  			( 10 * MS ) // >1.53ms according to datasheet
 #define write_cycle_delay()			do { ets_delay_us( DELAY ); } while ( 0 )
 
 /*==================[typedef]================================================*/
