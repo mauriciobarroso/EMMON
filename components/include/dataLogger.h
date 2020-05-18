@@ -23,7 +23,7 @@
 #include "esp_log.h"
 
 #include "i2c_conf.h"
-#include "at24c32.h"
+#include "at24cx.h"
 #include "ds3231.h"
 
 #include "dataTransmission.h"
@@ -49,10 +49,8 @@ typedef struct
 {
 	ds3231_t rtc;						/*!< RTC data */
 	data_transmission_t transmission;	/*!< transmission data */
-	uint16_t daily_pulses;				/*!< daily counted pulses */
-	uint32_t monthly_pulses;			/*!< monthly rquantity monthly of logged days */
-	uint16_t monthly_logged_days;		/*!< monthly quantity of logged days */
-	uint16_t total_logged_days;			/*!< total quantity of logged days */
+	uint16_t pulses;				/*!< daily counted pulses */
+	uint16_t logged_days;			/*!< total quantity of logged days */
 	uint32_t id;						/*!< user ID */
 	uint16_t index;						/*!< eeprom index data */
 } data_logger_t;
@@ -67,7 +65,7 @@ typedef struct
 void data_logger_init( data_logger_t * const me );
 
 // implementar una función para borrar eeprom
-// implementar una función para obtener log historico
+void data_logger_get_history( data_logger_t * const me );
 
 /*==================[cplusplus]==============================================*/
 
