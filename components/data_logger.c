@@ -7,7 +7,7 @@
 
 /*==================[inlcusions]============================================*/
 
-#include "dataLogger.h"
+#include <data_logger.h>
 
 /*==================[macros]=================================================*/
 
@@ -15,12 +15,11 @@
 #define DATA_LOGGER_PINS_MASK		( ( 1ULL << GPIO_PULSES ) | ( 1ULL << GPIO_ALARM ) )	/*!< data logger mask pins */
 
 /* addresses */
-#define USER_ID_ADDR				0x10	/*!< direccion en la eeprom donde se guarda el user ID */
-#define CURRENT_INDEX_ADDR			0x20	/*!< dirección en la eeprom donde se guarda la fecha */
-#define	TOTAL_LOGGED_DAYS_ADDR		0x22	/*!< dirección en la eeprom donde se guarda la cantidad de dias monitoreados */
+#define CURRENT_INDEX_ADDR			0x0	/*!< dirección en la eeprom donde se guarda la fecha */
+#define	TOTAL_LOGGED_DAYS_ADDR		0x2	/*!< dirección en la eeprom donde se guarda la cantidad de dias monitoreados */
 
 /* values */
-#define BASE_INDEX					0x30	/*!< índice base para el almacenamiento de pulsos (cambiar por EEPROM_OFFSET */
+#define BASE_INDEX					0x10	/*!< índice base para el almacenamiento de pulsos (cambiar por EEPROM_OFFSET */
 #define DATA_SIZE					5		/*!< tamaño en bytes de los datos guardados(pulsos diarios y fecha) en la EEPROM */
 
 /**/
@@ -55,6 +54,9 @@ void data_logger_init( data_logger_t * const me )
 	/* se inicializa la interfaz i2c */
 	i2c_init();
 
+	/* se inicializan los spiffs */
+	spiffs_init();
+
 //	uint8_t data = 0;
 //	for( uint16_t i = 0; i < 0xFF; i++ )
 //		at24cx_write8( i, &data );
@@ -77,12 +79,6 @@ void data_logger_init( data_logger_t * const me )
 		me->logged_days = 0;
 	ESP_LOGI( TAG, "logged days:%d", me->logged_days );
 
-	/* se inicializa la variable para el ID del usuario */
-	at24cx_read32( USER_ID_ADDR, &me->id );
-	if( me->id == 0x0 || me->id == 0xFFFFFFFF )
-		me->id = 0x12345678;
-	ESP_LOGI( TAG, "user:%X", me->id );
-
 	/* se obtiene la hora y fecha del RTC y se almacena en la eeprom */
 	ds3231_get_date( &me->rtc );
 	at24cx_write8( me->index + 2, &me->rtc.date.date );
@@ -92,8 +88,8 @@ void data_logger_init( data_logger_t * const me )
 
 	/* se configura la alarma 1 del RTC */
 	me->rtc.alarm1.seconds = 0x0;
-	me->rtc.alarm1.minutes = 0x32;
-	me->rtc.alarm1.hours = 0x2;
+	me->rtc.alarm1.minutes = 0x0;
+	me->rtc.alarm1.hours = 0x0;
 	me->rtc.alarm1.daydate = 0x0;
 	me->rtc.alarm1.mode = HOURS_MINUTES_SECONDS_MATCH;
 	ds3231_set_alarm( &me->rtc, ALARM1 );
@@ -123,7 +119,7 @@ void data_logger_init( data_logger_t * const me )
 	if( ds3231_get_alarm_flag( 1 ) )
 		xTaskNotifyGive( alarm_handle );
 
-	data_logger_get_history( me );
+//	data_logger_get_history( me );
 }
 
 void data_logger_get_history( data_logger_t * const me )
@@ -147,6 +143,7 @@ void data_logger_get_history( data_logger_t * const me )
 			ESP_LOGI( TAG, "E[%02X],%02x,%02x,%02x,%05d", i, date, month, year, pulses );
 			fprintf( f, "%02x,%02x,%02x,%05d\n", date, month, year, pulses );
 		}
+		fclose( f );
 		ESP_LOGI( TAG, "===============================" );
 	}
 }
@@ -215,9 +212,7 @@ static void alarm_task( void * arg )
 			taskENTER_CRITICAL();
 
 			/* se constuye el paquete y se manda  a la cola de Data Transmission */
-			data_logger->transmission.packet.pulses = data_logger->pulses;
-			data_logger->transmission.packet.id = data_logger->id;
-			xQueueSend( data_logger->transmission.queue, &data_logger->transmission, 0 );
+			xQueueSend( data_logger->transmission.queue, &data_logger->pulses, 0 );
 
 			/* se aumenta en 1 el conteo total de dias monitoreados y se guarda en la eeprom */
 			if( data_logger->logged_days < MAX_LOGGED_DAYS ) //!!!
