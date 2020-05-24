@@ -44,6 +44,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "queue.h"
+#include "semphr.h"
 
 #include "sx127x.h"
 
@@ -61,21 +62,17 @@ extern "C" {
 
 typedef struct
 {
-	uint32_t id;
-	uint16_t pulses;
-} data_transmission_packet_t;
-
-typedef struct
-{
-	data_transmission_packet_t packet;	/*!< datos para armar el paquete a transmitir */
-	QueueHandle_t queue;				/*!< cola de recepción de paquetes */
+	uint32_t id;				/*!< local address */
+	uint32_t broadcast;			/*!< broadcast address */
+	QueueHandle_t queue;		/*!< packet receive queue */
+	SemaphoreHandle_t mutex;	/*!< mutex for sx127x */
 } data_transmission_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-void data_transmission_init( data_transmission_t * const me );
+bool data_transmission_init( data_transmission_t * const me );
 
 /*==================[cplusplus]==============================================*/
 
