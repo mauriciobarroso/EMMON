@@ -204,7 +204,7 @@ int lora_end_packet( bool async )
     return 1;
 }
 
-int lora_parsePacket( int size )
+int lora_parse_packet( int size )
 {
     int packet_length = 0;
     int irq_flags = read_reg( REG_IRQ_FLAGS );
