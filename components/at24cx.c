@@ -54,7 +54,7 @@ uint8_t at24cx_read8( uint16_t address, uint8_t *data )
 	if( address > EEPROM_SIZE - sizeof( uint8_t ) )
 		return false;
 
-	i2c_read_reg16( at24cx_ADDR, address, data, 1 );
+	i2c_read_reg16( AT24CX_ADDR, address, data, 1 );
 
 	return true;
 }
@@ -66,7 +66,7 @@ uint8_t at24cx_read16( uint16_t address, uint16_t *data )
 
 	uint8_t data8[ 2 ];
 
-	i2c_read_reg16( at24cx_ADDR, address, data8, 2 );
+	i2c_read_reg16( AT24CX_ADDR, address, data8, 2 );
 
 	*data = ( uint16_t )( data8[ 0 ] << 8 ) |
 			 ( uint16_t )data8[ 1 ];
@@ -81,7 +81,7 @@ uint8_t at24cx_read32( uint16_t address, uint32_t *data )
 
 	uint8_t data8[ 4 ];
 
-	i2c_read_reg16( at24cx_ADDR, address, data8, 4 );
+	i2c_read_reg16( AT24CX_ADDR, address, data8, 4 );
 
 	*data = ( uint32_t )( data8[ 0 ] << 24 ) |
 			 ( uint32_t )( data8[ 1 ] << 16 ) |
@@ -96,7 +96,7 @@ uint8_t at24cx_write8( uint16_t address, uint8_t *data )
 	if( address > EEPROM_SIZE - sizeof( uint8_t ) )
 		return false;
 
-	i2c_write_reg16( at24cx_ADDR, address, data, 1 );
+	i2c_write_reg16( AT24CX_ADDR, address, data, 1 );
 
 	return true;
 }
@@ -111,8 +111,8 @@ uint8_t at24cx_write16( uint16_t address, uint16_t *data )
 	data8[ 0 ] = ( uint8_t )( ( *data & 0xFF00 ) >> 8 );
 	data8[ 1 ] = ( uint8_t )( *data & 0xFF );
 
-	i2c_write_reg16( at24cx_ADDR, address, &data8[ 0 ], 1 );
-	i2c_write_reg16( at24cx_ADDR, address + 1, &data8[ 1 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address, &data8[ 0 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address + 1, &data8[ 1 ], 1 );
 
 	return true;
 }
@@ -129,10 +129,10 @@ uint8_t at24cx_write32( uint16_t address, uint32_t *data )
 	data8[ 2 ] = ( uint8_t )( ( *data & 0x0000FF00 ) >> 8 );
 	data8[ 3 ] = ( uint8_t )( *data & 0x000000FF );
 
-	i2c_write_reg16( at24cx_ADDR, address, &data8[ 0 ], 1 );
-	i2c_write_reg16( at24cx_ADDR, address + 1, &data8[ 1 ], 1 );
-	i2c_write_reg16( at24cx_ADDR, address + 2, &data8[ 2 ], 1 );
-	i2c_write_reg16( at24cx_ADDR, address + 3, &data8[ 3 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address, &data8[ 0 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address + 1, &data8[ 1 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address + 2, &data8[ 2 ], 1 );
+	i2c_write_reg16( AT24CX_ADDR, address + 3, &data8[ 3 ], 1 );
 
 	return true;
 }

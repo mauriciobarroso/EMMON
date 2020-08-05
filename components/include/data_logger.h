@@ -37,23 +37,26 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-/*  debug mode*/
+/* debug mode */
 #define DEBUG_MESSAGES
 
 /* definicion de pines de interrupcion */
-#define GPIO_PULSES			0	/*!< pulses interrupt pin */
-#define GPIO_ALARM			3	/*!< alarm interrupt pin */
+#define GPIO_PULSES	4	/*!< pulses interrupt pin */
+#define GPIO_ALARM	5	/*!< alarm interrupt pin */
 
 /*==================[typedef]================================================*/
 
 typedef struct
 {
-	ds3231_t rtc;						/*!< RTC data */
-	data_transmission_t transmission;	/*!< transmission data */
-	uint16_t pulses;					/*!< daily counted pulses */
-	uint16_t logged_days;				/*!< total quantity of logged days */
-	uint32_t id;						/*!< user ID */
-	uint16_t index;						/*!< eeprom index data */
+	ds3231_t rtc;			/*!< rtc data */
+	uint16_t pulses;		/*!< daily counted pulses */
+	uint16_t logged_days;	/*!< quantity of logged days */
+	uint16_t index;			/*!< eeprom index */
+	QueueHandle_t queue;	/*!<  */
+	int frequency;			/*!< data transmission frequency */
+	float pulses_to_kwh;	/*!< constant to convert pulses to kwh */
+	char wifi_data[32];		/*!< wifi ssid and password */
+	int id;					/*!< user id */
 } data_logger_t;
 
 /*==================[external data declaration]==============================*/

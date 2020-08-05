@@ -25,6 +25,8 @@
 
 #include "wifi.h"
 
+#include "data_logger.h"
+
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -33,14 +35,22 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
+//#define USE_GZIP
+
 /*==================[typedef]================================================*/
+
+typedef struct
+{
+	uint16_t port;
+	uint16_t max_uri_handlers;
+
+} web_interface_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-esp_err_t start_webserver( void );
-void web_interface_init( void );
+void web_interface_init( data_logger_t * const me );
 
 /*==================[cplusplus]==============================================*/
 

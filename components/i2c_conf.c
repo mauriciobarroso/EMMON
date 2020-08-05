@@ -43,6 +43,9 @@
 
 /*==================[internal data declaration]==============================*/
 
+/* tag for debug */
+static const char * TAG = "i2c_module";
+
 /*==================[external data declaration]==============================*/
 
 /*==================[internal functions declaration]=========================*/
@@ -51,17 +54,24 @@
 
 esp_err_t i2c_init( void )
 {
+	ESP_LOGI( TAG, "Configuring pins I2C interface" );
+
     int i2c_master_port = I2C_MASTER_NUM;
     i2c_config_t conf;
 
     conf.mode = I2C_MODE_MASTER;
+    ESP_LOGI( TAG, "I2C in master mode" );
     conf.sda_io_num = I2C_MASTER_SDA_IO;
     conf.sda_pullup_en = 1;
     conf.scl_io_num = I2C_MASTER_SCL_IO;
     conf.scl_pullup_en = 1;
     conf.clk_stretch_tick = 300; // 300 ticks, Clock stretch is about 210us, you can make changes according to the actual situation.
     ESP_ERROR_CHECK( i2c_driver_install( i2c_master_port, conf.mode ) );
+    ESP_LOGI( TAG, "Installed I2C driver" );
     ESP_ERROR_CHECK( i2c_param_config( i2c_master_port, &conf ));
+    ESP_LOGI( TAG, "Configured I2C parameters" );
+
+    ESP_LOGI( TAG, "I2C interface configured!" );
 
     return ESP_OK;
 }

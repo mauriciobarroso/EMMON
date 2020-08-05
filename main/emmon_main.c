@@ -24,9 +24,16 @@
 
 /*==================[typedef]================================================*/
 
+typedef struct
+{
+	data_logger_t data_logger;
+	web_interface_t web_interface;
+	data_transmission_t data_transmission;
+} app_t;
+
 /*==================[data declaration]================================================*/
 
-data_logger_t data_logger;
+app_t data;
 
 /*==================[function declaration ]================================================*/
 
@@ -34,9 +41,13 @@ data_logger_t data_logger;
 
 void app_main ()
 {
-	data_logger_init ( &data_logger );
-	data_transmission_init ( &data_logger.transmission );
-	web_interface_init();
+
+	if( data_transmission_init ( &data.data_transmission ) )
+	{
+		data.data_logger.queue = data.data_transmission.queue;
+		data_logger_init ( &data.data_logger );
+		web_interface_init( &data.data_logger );
+	}
 }
 
 /*==================[function definition ]================================================*/

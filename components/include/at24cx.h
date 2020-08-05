@@ -53,8 +53,8 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define at24cx_ADDR			0x57	// device address for at24cxx
-#define EEPROM_SIZE				0x90	// EEPROM size in bytes (32Kbits)
+#define AT24CX_ADDR				0x57	// device address for at24cxx
+#define EEPROM_SIZE				0x1E2	// EEPROM size in bytes (32Kbits)
 #define EEPROM_INITIAL_ADDRESS	0x0		// EEPROM initial addres
 
 /*==================[typedef]================================================*/

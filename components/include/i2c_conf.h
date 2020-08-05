@@ -44,6 +44,9 @@
 #include "esp_err.h"
 #include "rom/ets_sys.h"
 
+#include "esp_system.h"
+#include "esp_log.h"
+
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -53,8 +56,8 @@ extern "C" {
 /*==================[macros]=================================================*/
 
 #ifndef I2C_MASTER_SCL_IO
-#define I2C_MASTER_SCL_IO			5	 			/* gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO           2				/* gpio number for I2C master data  */
+#define I2C_MASTER_SCL_IO			2	 			/* gpio number for I2C master clock */
+#define I2C_MASTER_SDA_IO           0				/* gpio number for I2C master data  */
 #define I2C_MASTER_NUM              I2C_NUM_0		/* I2C port number for master dev */
 #define I2C_MASTER_TX_BUF_DISABLE   0				/* I2C master do not need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE   0				/* I2C master do not need buffer */

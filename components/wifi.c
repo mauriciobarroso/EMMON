@@ -15,7 +15,7 @@
 
 /*==================[internal data declaration]==============================*/
 
-static const char * TAG = "wifi";
+static const char * TAG = "web_server";
 static EventGroupHandle_t wifi_event_group;
 static int s_retry_num = 0;
 
@@ -28,7 +28,7 @@ static void ip_event_handler( void * arg, esp_event_base_t event_base, int32_t e
 
 /*==================[external functions definition]=========================*/
 
-void wifi_init( void )
+void wifi_init( char * wifi_data )
 {
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_netif_init() );
@@ -42,26 +42,7 @@ void wifi_init( void )
     ESP_ERROR_CHECK(esp_event_handler_register( WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL ) ); // sta
     ESP_ERROR_CHECK(esp_event_handler_register( IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL ) ); // sta
 
-    /* se busca la información del último ap al que se conectó */
-//	FILE * f = NULL;
-	char buf[ 100 ];
-
-//	f = fopen( "/spiffs/sta_data.txt", "w" );
-//	memset(buf, 0, sizeof(buf));
-	sprintf(buf, "CASAwifi&orcobebe");
-//	fprintf(f, buf );
-//	fclose( f );
-
-//	f = fopen( "/spiffs/sta_data.txt", "r" );
-//	if( f != 0 )
-//	{
-//		fgets( buf, sizeof( buf ), f );
-//		fclose( f );
-		wifi_sta_mode( buf, strlen( buf ) );
-
-//	}
-//	else
-//		wifi_ap_mode();
+    wifi_sta_mode( wifi_data, strlen( wifi_data ) );
 }
 
 void wifi_sta_mode( char * buf, size_t len )
@@ -71,7 +52,7 @@ void wifi_sta_mode( char * buf, size_t len )
 	char ssid[ 32 ];
 	char pass[ 32 ];
 
-	sscanf( buf, "%[^&]&%s", ssid, pass );
+	sscanf( buf, "%[^,],%s", ssid, pass );
 
 	/* se definen los parámetros de configuración del modo STA */
 	wifi_config_t wifi_config_sta = { 0 };
@@ -90,15 +71,22 @@ void wifi_sta_mode( char * buf, size_t len )
 
 	EventBits_t bits = xEventGroupWaitBits( wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
-	/* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-	 * happened. */
+	/* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually happened. */
 	if (bits & WIFI_CONNECTED_BIT)
 	{
+		/* se edita el archivo de configuración de wifi y si no existe se crea */
 		FILE * f = NULL;
-		f = fopen( "/spiffs/sta_data.txt", "w" );
-		sprintf( buf, "%s&%s", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password );
-		fprintf( f, buf );
-		fclose( f );
+//		f = fopen( "/spiffs/sta_data.txt", "w" );
+//		sprintf( buf, "%s,%s", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password );
+//		fprintf( f, buf );
+//		fclose( f );
+
+		f = fopen( "/spiffs/config.txt", "w" );
+		if( f != 0 )
+		{
+			fprintf( f, "4\n0.000625\n%s,%s\n", wifi_config_sta.sta.ssid, wifi_config_sta.sta.password );
+			fclose( f );
+		}
 
 		ESP_LOGI(TAG, "Connected to AP with SSID:%s and password:%s", ssid, pass);
 	}
@@ -198,8 +186,8 @@ static void ip_event_handler( void* arg, esp_event_base_t event_base, int32_t ev
     	{
 			case IP_EVENT_STA_GOT_IP:
 			{
-				ip_event_got_ip_t * event = ( ip_event_got_ip_t * ) event_data;
-				ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa( &event->ip_info.ip ) );
+				//ip_event_got_ip_t * event = ( ip_event_got_ip_t * ) event_data;
+				//ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa( &event->ip_info.ip ) );
 				s_retry_num = 0;
 				xEventGroupSetBits( wifi_event_group, WIFI_CONNECTED_BIT );
 				break;

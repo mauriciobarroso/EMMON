@@ -38,7 +38,7 @@ extern "C" {
 
 
 #define AP_WIFI_SSID		"EMMON"
-#define AP_WIFI_PASS		"123456789"
+#define AP_WIFI_PASS		"mauriciobarroso"
 #define AP_MAX_STA_CONN		10
 
 #define ESP_MAX_RETRY		3
@@ -52,7 +52,7 @@ extern "C" {
 
 /*==================[external functions declaration]=========================*/
 
-void wifi_init( void );
+void wifi_init( char * wifi_data );
 void wifi_sta_mode( char * buf, size_t len );
 void wifi_ap_mode( void );
 

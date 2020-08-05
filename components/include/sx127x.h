@@ -31,8 +31,8 @@ extern "C" {
 
 #define SX127X_RESET_PIN		16
 #define SX127X_RESET_PIN_MASK	( 1ULL << SX127X_RESET_PIN )
-#define SX127X_DIO0_PIN			4
-#define SX127X_DIO0_PIN_MASK	( 1ULL << SX127X_DIO0_PIN )
+//#define SX127X_DIO0_PIN			4
+//#define SX127X_DIO0_PIN_MASK	( 1ULL << SX127X_DIO0_PIN )
 
 /*==================[typedef]================================================*/
 
@@ -70,6 +70,10 @@ void lora_disable_invert_iq( void );
 void lora_set_ocp( uint8_t current ); // Over Current Protection control
 uint8_t lora_random( void );
 
+void lora_send_packet( char * buf, int size );
+int lora_receive_packet( char * buf, int size );
+int lora_received( void );
+void lora_recv( void );
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus

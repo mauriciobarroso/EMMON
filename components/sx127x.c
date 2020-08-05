@@ -72,6 +72,9 @@ static void ( *__onTxDone )( void );
 /*==================[external data declaration]==============================*/
 
 /*==================[internal functions declaration]=========================*/
+
+static const char * TAG = "spi_module";
+
 /* read and write registers */
 static void write_reg( uint8_t reg, uint8_t value );
 static uint8_t read_reg( uint8_t reg );
@@ -92,6 +95,8 @@ static void set_ldo_flag( void );
 
 int lora_begin( long frequency )
 {
+	ESP_LOGI( TAG, "Configuring pins and SPI interface..." );
+
 	/* reset lora */
     if (SX127X_RESET_PIN != -1) {
         gpio_config_t io_conf;
@@ -117,14 +122,19 @@ int lora_begin( long frequency )
     spi_config.interface.byte_tx_order = 1;
     spi_config.interface.bit_rx_order = 0;
     spi_config.interface.byte_rx_order = 0;
+    ESP_LOGI( TAG, "SPI configured with default parameters" );
 
     spi_config.intr_enable.val = SPI_MASTER_DEFAULT_INTR_ENABLE;
 
     spi_config.mode = SPI_MASTER_MODE;
+    ESP_LOGI( TAG, "SPI in master mode" );
 
     spi_config.clk_div = SPI_8MHz_DIV;
+    ESP_LOGI( TAG, "Clock configured in 8 MHz" );
     spi_config.event_cb = NULL;
     spi_init(HSPI_HOST, &spi_config);
+
+    ESP_LOGI( TAG, "SPI interface configured!" );
 
     /* check version */
     uint8_t version = read_reg( REG_VERSION );
@@ -175,7 +185,7 @@ int lora_begin_packet( int implicitHeader )
     else
     	explicit_header_mode();
 
-    /* reset FIFO address and paload length */
+    /* reset FIFO address and payload length */
     write_reg( REG_FIFO_ADDR_PTR, 0 );
     write_reg( REG_PAYLOAD_LENGTH, 0 );
 
@@ -218,11 +228,10 @@ int lora_parse_packet( int size )
     	explicit_header_mode();
 
     /* clear IRQ's */
-    write_reg(REG_IRQ_FLAGS, irq_flags);
+    write_reg( REG_IRQ_FLAGS, irq_flags );
 
-    if( ( irq_flags & IRQ_RX_DONE_MASK ) && ( irq_flags & IRQ_PAYLOAD_CRC_ERROR_MASK ) == 0)
+    if( ( irq_flags & IRQ_RX_DONE_MASK ) && ( irq_flags & IRQ_PAYLOAD_CRC_ERROR_MASK ) == 0 )
     {
-
 		/* received a packet */
 		__packet_index = 0;
 
@@ -559,6 +568,83 @@ void lora_handleDio0Rise()
         }
     }
 }*/
+
+
+void lora_send_packet( char * buf, int size )
+{
+	/* transfer data to radio */
+	lora_idle();
+	write_reg( REG_FIFO_ADDR_PTR, 0 );
+	write_reg( REG_PAYLOAD_LENGTH, 0 );
+
+	int current_length = read_reg( REG_PAYLOAD_LENGTH );
+
+	/* check size */
+	if( ( current_length + size ) > MAX_PKT_LENGTH )
+		size = MAX_PKT_LENGTH - current_length;
+
+	/* write data */
+	for ( size_t i = 0; i < size; i++ )
+		write_reg( REG_FIFO, buf[ i ] );
+
+	/* update length */
+	write_reg( REG_PAYLOAD_LENGTH, current_length + size );
+
+	/* start transmission and wait for conclusion */
+	write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX );
+	ESP_LOGI( TAG, "OK1");
+	while( ( read_reg( REG_IRQ_FLAGS ) & IRQ_TX_DONE_MASK ) == 0 )
+		vTaskDelay( 2 );
+	ESP_LOGI( TAG, "OK2");
+	write_reg( REG_IRQ_FLAGS, IRQ_TX_DONE_MASK );
+	ESP_LOGI( TAG, "OK3");
+}
+
+int lora_receive_packet( char * buf, int size )
+{
+	int len = 0;
+
+	/* check interrupts */
+	int irq = read_reg( REG_IRQ_FLAGS );
+	write_reg( REG_IRQ_FLAGS, irq );
+
+	if( !( irq & IRQ_RX_DONE_MASK ) )
+		return 0;
+
+	if( irq & IRQ_PAYLOAD_CRC_ERROR_MASK )
+		return 0;
+
+	/* find packet size */
+	if( __implicit_header_mode )
+		len = read_reg( REG_PAYLOAD_LENGTH );
+	else
+		len = read_reg( REG_RX_NB_BYTES );
+
+	/* transfer data from radio */
+	lora_idle();
+	write_reg( REG_FIFO_ADDR_PTR, read_reg( REG_FIFO_RX_CURRENT_ADDR ) );
+
+	if( len > size )
+		len = size;
+
+	for( int i = 0; i < len; i++ )
+		buf[ i ] = read_reg( REG_FIFO );
+
+	return len;
+}
+
+int lora_received( void )
+{
+	if( read_reg( REG_IRQ_FLAGS ) & IRQ_RX_DONE_MASK )
+		return 1;
+
+	return 0;
+}
+
+void lora_recv( void )
+{
+	write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS );
+}
 
 /*==================[internal functions definition]==========================*/
 
