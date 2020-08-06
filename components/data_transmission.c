@@ -17,13 +17,12 @@
 
 /*==================[internal data declaration]==============================*/
 
-static const char * TAG = "lora_communication";
+static const char * TAG = "data_communication";
 
 /*==================[external data declaration]==============================*/
 
 /*==================[internal functions declaration]=========================*/
 
-static void send_to_gateway( void * arg );
 static void actions( char * buf );
 
 /*==================[external functions definition]=========================*/
@@ -38,46 +37,39 @@ bool data_transmission_init( data_transmission_t * const me )
 		return 0;
 	}
 	ESP_LOGI( TAG, "lora frequency 433 MHz" );
-	ESP_LOGI( TAG, "Configured lora transceiver!" );
+	ESP_LOGI( TAG, "Configured lora!" );
 
 	/* se crea la cola */
-	me->queue = xQueueCreate( 10, sizeof( float ) );
+	me->queue = xQueueCreate( 10, sizeof( uint16_t ) );
 	if( me->queue == NULL )
 	{
 		ESP_LOGI( TAG, "failed to create queue" );
 		return 0;
 	}
-	ESP_LOGI( TAG, "Created queue for incoming data for data_logger!" );
+	ESP_LOGI( TAG, "Created queue!" );
 
-	/* se crean las tareas */
-	xTaskCreate( send_to_gateway, "Send to gateway Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 1, NULL );
-	ESP_LOGI( TAG, "Created task!" );
 	return 1;
 }
 
-/*==================[internal functions definition]==========================*/
-
-static void send_to_gateway( void * arg )	/* cambiar nombre! */
+void send_to_gateway( void * arg )	/* cambiar nombre! */
 {
 	data_transmission_t * data_transmission = ( data_transmission_t * )arg;
 	char buf[ MAX_PACKET_LEN ];
-	float pulses;
+	uint16_t pulses;
 
 	for( ;; )
 	{
 		while( uxQueueMessagesWaiting( data_transmission->queue ) != 0 )
 		{
+			ESP_LOGI( TAG, "ENTRO!" );
 			/* se bloquea esperando paquetes a transmitir */
 			if( xQueueReceive( data_transmission->queue, &pulses, portMAX_DELAY ) == pdTRUE )	/*revisar!*/
 			{
-				/* send to LoRa gateway */
-				sprintf( buf, "%06.2f,%010X", pulses, HOST_ADDR );	/* se arma el paquete a transmitir */
+				/* send to LoRa gateway REVISAR!!! */
+				sprintf( buf, "%06.2f,%010X", pulses * 0.000625, HOST_ADDR );	/* se arma el paquete a transmitir */
 
-				lora_idle();
 				lora_disable_invert_iq();
-				lora_begin_packet( false );
-				lora_write( ( uint8_t * )buf, sizeof( buf ));
-				lora_end_packet( true );
+				lora_send_packet( buf, strlen( buf ) );
 
 				ESP_LOGI( TAG, buf );	/* se imprime por consola el paquete a enviar */
 			}
@@ -98,9 +90,12 @@ static void send_to_gateway( void * arg )	/* cambiar nombre! */
 			actions( buf );
 		}
 
-		vTaskDelay( pdMS_TO_TICKS( 1000 ) );
+		vTaskDelay( pdMS_TO_TICKS( 500 ) );
 	}
 }
+
+
+/*==================[internal functions definition]==========================*/
 
 static void actions( char * buf )
 {

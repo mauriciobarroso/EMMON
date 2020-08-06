@@ -17,18 +17,15 @@
 #include "freertos/task.h"
 #include "queue.h"
 
-#include "driver/gpio.h"
-
 #include "esp_system.h"
 #include "esp_log.h"
 
+#include "driver/gpio.h"
+
 #include "i2c_conf.h"
 #include "at24cx.h"
-#include "data_transmission.h"
 #include "ds3231.h"
 #include "spiffs.h"
-
-
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -48,15 +45,15 @@ extern "C" {
 
 typedef struct
 {
-	ds3231_t rtc;			/*!< rtc data */
-	uint16_t pulses;		/*!< daily counted pulses */
-	uint16_t logged_days;	/*!< quantity of logged days */
-	uint16_t index;			/*!< eeprom index */
-	QueueHandle_t queue;	/*!<  */
-	int frequency;			/*!< data transmission frequency */
-	float pulses_to_kwh;	/*!< constant to convert pulses to kwh */
-	char wifi_data[32];		/*!< wifi ssid and password */
-	int id;					/*!< user id */
+	ds3231_t rtc;				/*!< rtc data */
+	uint16_t pulses;			/*!< daily counted pulses */
+	uint16_t logged_days;		/*!< quantity of logged days */
+	uint16_t index;				/*!< eeprom index */
+	QueueHandle_t queue;		/*!<  */
+	TaskHandle_t pulses_handle;	/*!< pulses_task handle */
+	TaskHandle_t alarm_handle;	/*!< alarm task handle */
+	spiffs_t settings;			/*!< data from settings.txt */
+
 } data_logger_t;
 
 /*==================[external data declaration]==============================*/
@@ -68,12 +65,20 @@ typedef struct
  */
 void data_logger_init( data_logger_t * const me );
 
-// implementar una función para borrar eeprom
+/**
+ * @brief Data Logger initialization
+ */
+void data_loggger_pulses_task( void * arg );
 
 /**
- * @brief Data Logger get history data of EEPROM
+ * @brief Data Logger initialization
  */
-void data_logger_get_history( data_logger_t * const me );
+void data_loggger_alarm_task( void * arg );
+
+/**
+ * @brief Data Logger initialization
+ */
+void data_logger_get_csv( data_logger_t * const me );
 
 /*==================[cplusplus]==============================================*/
 

@@ -15,7 +15,7 @@
 
 /*==================[internal data declaration]==============================*/
 
-static const char * TAG = "web_server";
+static const char * TAG = "wifi";
 static EventGroupHandle_t wifi_event_group;
 static int s_retry_num = 0;
 
@@ -31,18 +31,25 @@ static void ip_event_handler( void * arg, esp_event_base_t event_base, int32_t e
 void wifi_init( char * wifi_data )
 {
     tcpip_adapter_init();
+    ESP_LOGI( TAG, "a" );
     ESP_ERROR_CHECK( esp_netif_init() );
+    ESP_LOGI( TAG, "b" );
     ESP_ERROR_CHECK( esp_event_loop_create_default() );
+    ESP_LOGI( TAG, "c" );
 
     /* se inicializa wifi con la configuración por defecto */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init( &cfg ) );
+    ESP_LOGI( TAG, "d" );
 
     /* se registran los handler de los eventos de wifi e ip */
     ESP_ERROR_CHECK(esp_event_handler_register( WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL ) ); // sta
+    ESP_LOGI( TAG, "e" );
     ESP_ERROR_CHECK(esp_event_handler_register( IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL ) ); // sta
+    ESP_LOGI( TAG, "f" );
 
     wifi_sta_mode( wifi_data, strlen( wifi_data ) );
+    ESP_LOGI( TAG, "g" );
 }
 
 void wifi_sta_mode( char * buf, size_t len )

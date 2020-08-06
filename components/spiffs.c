@@ -21,6 +21,8 @@ static const char * TAG = "spiffs";
 
 /*==================[internal functions declaration]=========================*/
 
+/*==================[external functions definition]=========================*/
+
 esp_err_t spiffs_init( void )
 {
 	ESP_LOGI( TAG, "Initializing SPIFFS" );
@@ -59,7 +61,46 @@ esp_err_t spiffs_init( void )
 	return ESP_OK;
 }
 
-/*==================[external functions definition]=========================*/
+void spiffs_get_settings( spiffs_t * const me )
+{
+	FILE * f = NULL;
+	f = fopen( "/spiffs/config.txt", "r" );
+	if( f != 0 )
+	{
+		char line[ 32 ];
+		for( uint8_t i = 0; fgets( line, sizeof( line ), f ) != NULL; i++ )
+		{
+			switch( i )
+			{
+				case 0:
+				{
+					sscanf( line, "%d", &me->frequency );
+					ESP_LOGI( TAG, "data_frequency=%d", me->frequency );
+					break;
+				}
+				case 1:
+				{
+					sscanf( line, "%f", &me->pulses_to_kwh );
+					ESP_LOGI( TAG, "pulse_to_kwh=%f", me->pulses_to_kwh );
+					break;
+				}
+				case 2:
+				{
+					sscanf( line, "%s", me->wifi_data );
+					ESP_LOGI( TAG, "wifi_data=%s", me->wifi_data );
+					break;
+				}
+				default:
+				{
+					ESP_LOGI( TAG, "ERROR" );
+					break;
+				}
+			}
+		}
+
+		fclose( f );
+	}
+}
 
 /*==================[internal functions definition]==========================*/
 

@@ -19,6 +19,7 @@
 #include "queue.h"
 
 #include "sx127x.h"
+#include "spiffs.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -38,6 +39,7 @@ extern "C" {
 typedef struct
 {
 	QueueHandle_t queue;		/*!< packet receive queue */
+	spiffs_t settings;			/*!< data from settings.txt */
 } data_transmission_t;
 
 /*==================[external data declaration]==============================*/
@@ -46,6 +48,7 @@ typedef struct
 
 bool data_transmission_init( data_transmission_t * const me );
 
+void send_to_gateway( void * arg );	/* cambiar nombre! */
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
