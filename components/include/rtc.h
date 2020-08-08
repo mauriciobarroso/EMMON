@@ -1,5 +1,5 @@
 /*
- * ds3231.h
+ * rtc.h
  *
  * Created on: Nov 1, 2019
  * Author: Mauricio Barroso
@@ -10,11 +10,15 @@
 
 /*==================[inclusions]=============================================*/
 
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include "freertos/FreeRTOS.h"
 #include "esp_err.h"
+
+#include "esp_system.h"
+#include "esp_log.h"
+
 #include "driver/i2c.h"
-#include "i2c_conf.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -24,7 +28,21 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
+#ifndef I2C_MASTER_SCL_IO
+#define I2C_MASTER_SCL_IO			2	 			/* gpio number for I2C master clock */
+#define I2C_MASTER_SDA_IO           0				/* gpio number for I2C master data  */
+#define I2C_MASTER_NUM              I2C_NUM_0		/* I2C port number for master dev */
+#define I2C_MASTER_TX_BUF_DISABLE   0				/* I2C master do not need buffer */
+#define I2C_MASTER_RX_BUF_DISABLE   0				/* I2C master do not need buffer */
+#endif
 
+#define WRITE_BIT                   I2C_MASTER_WRITE /* I2C master write */
+#define READ_BIT                    I2C_MASTER_READ  /* I2C master read */
+#define ACK_CHECK_EN                0x1              /* I2C master will check ack from slave*/
+#define ACK_CHECK_DIS               0x0              /* I2C master will not check ack from slave */
+#define ACK_VAL                     0x0              /* I2C ack value */
+#define NACK_VAL                    0x1              /* I2C nack value */
+#define LAST_NACK_VAL               0x2              /* I2C last_nack value */
 
 /*==================[typedef]================================================*/
 
@@ -35,14 +53,14 @@ typedef enum
 	OUTPUT_1024KHZ = 0x48,	/*!< set SQW/OUT output to 1024KHz */
 	OUTPUT_4096KHZ = 0x50,	/*!< set SQW/OUT output to 4096KHz */
 	OUTPUT_8192KHZ = 0x58,	/*!< set SQW/OUT output to 8192KHz */
-} ds3231_sqw_out_frequency_t;
+} rtc_sqw_out_frequency_t;
 
 /* Alarm numbers */
 typedef enum
 {
 	ALARM1,	/*! Alarm 1 number */
 	ALARM2,	/*! Alarm 2 number */
-} ds3231_alarm_number_t;
+} rtc_alarm_number_t;
 
 /* Alarm Interrupt Status */
 typedef enum
@@ -51,7 +69,7 @@ typedef enum
 	ENABLE_ALARM1 = 0x5,	/*!< enable interrupt of alarm 1 */
 	ENABLE_ALARM2 = 0x6,	/*!< enable interrupt of alarm 2 */
 	ENABLE_ALL = 0x07,		/*!< enable interrupt of alarm 1 and alarm 2 */
-} ds3231_alarm_interrupt_mode_t;
+} rtc_alarm_interrupt_mode_t;
 
 /* Alarm 1 modes */
 typedef enum
@@ -63,7 +81,7 @@ typedef enum
 	DATE_HOURS_MINUTES_SECONDS_MATCH = 0x0,	/*!< set alarm 1 when date, hours, minutes and seconds match */
 	DAY_HOURS_MINUTES_SECONDS_MATCH = 0x10,	/*!< set alarm 1 when day, hours, minutes and seconds match */
 
-} ds3231_alarm1_mode_t;
+} rtc_alarm1_mode_t;
 
 /* Alarm 2 modes */
 typedef enum
@@ -73,7 +91,7 @@ typedef enum
 	HOURS_MINUTES_MATCH = 0x4,		/*!< set alarm 2 when hours and minutes match */
 	DATE_HOURS_MINUTES_MATCH = 0x0,	/*!< set alarm 2 when date, hours and minutes */
 	DAY_HOURS_MINUTES_MATCH = 0x8,	/*!< set alarm 2 when day, hours and minutes */
-} ds3231_alarm2_mode_t;
+} rtc_alarm2_mode_t;
 
 /* days of the week */
 typedef enum
@@ -85,22 +103,22 @@ typedef enum
 	THURSDAY = 5,	/*! fifth day of week */
 	FRIDAY = 6,		/*! sixth day of week */
 	SATURDAY = 7,	/*! seventh day of week */
-} ds3231_day_t;
+} rtc_day_t;
 
 typedef struct
 {
 	uint8_t seconds;	/*!< seconds of RTC*/
 	uint8_t minutes;	/*!< minutes of RTC */
 	uint8_t hours;		/*!< hours of RTC */
-} ds3231_time_t;
+} rtc_time_t;
 
 typedef struct
 {
-	ds3231_day_t day;	/*!< day of RTC */
+	rtc_day_t day;	/*!< day of RTC */
 	uint8_t date;		/*!< date of RTC */
 	uint8_t month;		/*!< month of RTC */
 	uint8_t year;		/*!< year of RTC */
-} ds3231_date_t;
+} rtc_date_t;
 
 typedef struct
 {
@@ -108,44 +126,44 @@ typedef struct
 	uint8_t minutes;			/*!< minutes of alarm 1 */
 	uint8_t hours;				/*!< horus of alarm 1 */
 	uint8_t daydate;			/*!< day or date of alarm 1 */
-	ds3231_alarm1_mode_t mode;	/*!< mode of alarm 1 */
-} ds3231_alarm1_t;
+	rtc_alarm1_mode_t mode;	/*!< mode of alarm 1 */
+} rtc_alarm1_t;
 
 typedef struct
 {
 	uint8_t minutes;			/*!< minutes of alarm 2 */
 	uint8_t hours;				/*!< hours of alarm 2 */
 	uint8_t daydate;			/*!< day or date of alarm 2 */
-	ds3231_alarm2_mode_t mode;	/*!< mode of alarm 2 */
-} ds3231_alarm2_t;
+	rtc_alarm2_mode_t mode;	/*!< mode of alarm 2 */
+} rtc_alarm2_t;
 
 typedef struct
 {
-	ds3231_time_t time;
-	ds3231_date_t date;
-	ds3231_alarm1_t alarm1;
-	ds3231_alarm2_t alarm2;
-	ds3231_sqw_out_frequency_t sqw_out;
-	ds3231_alarm_interrupt_mode_t alarm_interrupt_mode;
-} ds3231_t;
+	rtc_time_t time;
+	rtc_date_t date;
+	rtc_alarm1_t alarm1;
+	rtc_alarm2_t alarm2;
+	rtc_sqw_out_frequency_t sqw_out;
+	rtc_alarm_interrupt_mode_t alarm_interrupt_mode;
+} rtc_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-esp_err_t ds3231_init( ds3231_t * const me );
-esp_err_t ds3231_get_time( ds3231_t * const me );
-esp_err_t ds3231_get_date( ds3231_t * const me );
-esp_err_t ds3231_set_time( ds3231_t * const me );
-esp_err_t ds3231_set_date( ds3231_t * const me );
-esp_err_t ds3231_get_alarm( ds3231_t * const me, ds3231_alarm_number_t number );
-esp_err_t ds3231_set_alarm( ds3231_t * const me, ds3231_alarm_number_t number );
-esp_err_t ds3231_set_alarm_interrupt( ds3231_t * const me );
-esp_err_t ds3231_set_sqw_output( ds3231_sqw_out_frequency_t mode );
-void ds3231_get_control( uint8_t *data );
-void ds3231_get_control_status( uint8_t *data );
-bool ds3231_get_alarm_flag( uint8_t alarm );
-void ds3231_clear_alarm_flag( uint8_t alarm );
+void rtc_init( void );
+esp_err_t rtc_get_time( rtc_t * const me );
+esp_err_t rtc_get_date( rtc_t * const me );
+esp_err_t rtc_set_time( rtc_t * const me );
+esp_err_t rtc_set_date( rtc_t * const me );
+esp_err_t rtc_get_alarm( rtc_t * const me, rtc_alarm_number_t number );
+esp_err_t rtc_set_alarm( rtc_t * const me, rtc_alarm_number_t number );
+esp_err_t rtc_set_alarm_interrupt( rtc_t * const me );
+esp_err_t rtc_set_sqw_output( rtc_sqw_out_frequency_t mode );
+void rtc_get_control( uint8_t *data );
+void rtc_get_control_status( uint8_t *data );
+bool rtc_get_alarm_flag( uint8_t alarm );
+void rtc_clear_alarm_flag( uint8_t alarm );
 
 /*==================[cplusplus]==============================================*/
 

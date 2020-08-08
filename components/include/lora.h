@@ -1,6 +1,10 @@
-/* Mauricio Barroso
- * Date: 04/02/20
+/*
+ * lora.h
+ *
+ * Created on: Nov 1, 2019
+ * Author: Mauricio Barroso
  */
+
 
 #ifndef _SX127X_H_
 #define _SX127X_H_

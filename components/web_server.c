@@ -1,5 +1,5 @@
 /*
- * web_interface.c
+ * web_server.c
  *
  * Created on: Nov 1, 2019
  * Author: Mauricio Barroso
@@ -7,7 +7,7 @@
 
 /*==================[inlcusions]============================================*/
 
-#include <web_interface.h>
+#include <web_server.h>
 
 /*==================[macros]=================================================*/
 

@@ -1,19 +1,21 @@
 /*
- * wifi.c
+ * web_server.h
  *
  * Created on: Nov 1, 2019
  * Author: Mauricio Barroso
  */
 
-#ifndef _WIFI_H_
-#define _WIFI_H_
+#ifndef _WEBS_INTERFACE_H_
+#define _WEBS_INTERFACE_H_
 
 /*==================[inclusions]=============================================*/
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,12 +23,15 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_vfs.h"
 
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "esp_http_server.h"
+#include "spiffs.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -36,6 +41,7 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
+//#define USE_GZIP
 
 #define AP_WIFI_SSID		"EMMON"
 #define AP_WIFI_PASS		"mauriciobarroso"
@@ -48,13 +54,24 @@ extern "C" {
 
 /*==================[typedef]================================================*/
 
+typedef struct
+{
+	char wifi_sta[ 32 ];
+	char wifi_ap[ 32 ];
+} wifi_t;
+
+typedef struct
+{
+	uint16_t port;
+	uint16_t max_uri_handlers;
+	spiffs_t settings;
+} web_server_t;
+
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-void wifi_init( char * wifi_data );
-void wifi_sta_mode( char * buf, size_t len );
-void wifi_ap_mode( void );
+void web_server_init( web_server_t * const me );
 
 /*==================[cplusplus]==============================================*/
 
@@ -65,4 +82,4 @@ void wifi_ap_mode( void );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _WIFI_H_ */
+#endif /* #ifndef _WEBS_INTERFACE_H_ */

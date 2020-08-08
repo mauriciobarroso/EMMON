@@ -1,27 +1,25 @@
 /*
- * data_logger.h
+ * data_transmission.h
  *
  * Created on: Nov 1, 2019
  * Author: Mauricio Barroso
  */
 
-#ifndef _EMMON_H_
-#define _EMMON_H_
+#ifndef _DATATRANSMISSION_H_
+#define _DATATRANSMISSION_H_
 
 /*==================[inclusions]=============================================*/
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
 
-#include <sys/unistd.h>
-#include <sys/stat.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "lora.h"
+#include "queue.h"
 
-#include "data_logger.h"
-#include "data_transmission.h"
-#include "web_interface.h"
+#include "spiffs.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -31,21 +29,26 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
+#define QUEUE_LENGTH	4
+#define GATEWAY_ADDR	0x0
+#define HOST_ADDR		0x12345678
+#define BROADCAST_ADDR	0xFFFFFFFF
+
 /*==================[typedef]================================================*/
 
 typedef struct
 {
-	data_logger_t data_logger;				/*!< user id */
-	web_server_t web_server;				/*!< user id */
-	data_transmission_t data_transmission;	/*!< user id */
-} emmon_t;
+	QueueHandle_t queue;		/*!< packet receive queue */
+	spiffs_t settings;			/*!< data from settings.txt */
+} data_transmission_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-void emmon_init( emmon_t * const me );
+bool data_transmission_init( data_transmission_t * const me );
 
+void send_to_gateway( void * arg );	/* cambiar nombre! */
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -55,4 +58,4 @@ void emmon_init( emmon_t * const me );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _EMMON_H_ */
+#endif /* #ifndef _DATATRANSMISSION_H_ */

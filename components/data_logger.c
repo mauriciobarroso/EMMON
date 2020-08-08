@@ -48,82 +48,40 @@ static void set_data_frequency( data_logger_t * const me );
 
 void data_logger_init( data_logger_t * const me )
 {
-	/* se inicializa la interfaz i2c */
-	i2c_init();	/* cambiar por dos funciones de rtc y eeprom!!! */
+	/* se inicializa rtc */
+
+	/* se inicializa eeprom */
+	eeprom_init();
 
 	me->rtc.time.hours = 0x23;
 	me->rtc.time.minutes = 0x59;
 	me->rtc.time.seconds = 0x58;
-	ds3231_set_time( &me->rtc );
+	rtc_set_time( &me->rtc );
 
 	/* se inicializa la variable para el índice de conteo de pulsos */
-	at24cx_read16( CURRENT_INDEX_ADDR, &me->index );
+	eeprom_read16( CURRENT_INDEX_ADDR, &me->index );
 	if( me->index < BASE_INDEX || me->index == 0xFFFF )
 		me->index = BASE_INDEX;
 	ESP_LOGI( TAG, "index:0x%X", me->index );
 
 	/* se inicializa la variable para el conteo de pulsos */
-	at24cx_read16( me->index, &me->pulses );
+	eeprom_read16( me->index, &me->pulses );
 	if( me->pulses == 0xFFFF )
 		me->pulses = 0;
 	ESP_LOGI( TAG, "pulses:%d", me->pulses );
 
 	/* se inicializa la variable para el conteo total de días monitoreados */
-	at24cx_read16( TOTAL_LOGGED_DAYS_ADDR, &me->logged_days );
+	eeprom_read16( TOTAL_LOGGED_DAYS_ADDR, &me->logged_days );
 	if( me->logged_days == 0xFFFF )
 		me->logged_days = 0;
 	ESP_LOGI( TAG, "logged_days:%d", me->logged_days );
 
 	/* se obtiene la fecha del rtc y se almacena en la eeprom */
-	ds3231_get_date( &me->rtc );
-	at24cx_write8( me->index + 2, &me->rtc.date.date );
-	at24cx_write8( me->index + 3, &me->rtc.date.month );
-	at24cx_write8( me->index + 4, &me->rtc.date.year );
+	rtc_get_date( &me->rtc );
+	eeprom_write8( me->index + 2, &me->rtc.date.date );
+	eeprom_write8( me->index + 3, &me->rtc.date.month );
+	eeprom_write8( me->index + 4, &me->rtc.date.year );
 	ESP_LOGI( TAG, "date:%02x/%02x/%02x", me->rtc.date.date, me->rtc.date.month, me->rtc.date.year );
-}
-
-void data_loggger_pulses_task( void * arg )
-{
-	uint32_t event_to_process;
-	data_logger_t * data_logger = ( data_logger_t * )arg;
-
-	/* se configuran GPIOs */
-	ESP_LOGI( TAG, "Configuring pulses GPIO..." );
-	gpio_config_t gpio_conf;
-	gpio_conf.pin_bit_mask = 1ULL << GPIO_PULSES;
-	gpio_conf.mode = GPIO_MODE_INPUT;
-	gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-	gpio_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-	gpio_conf.intr_type = GPIO_INTR_POSEDGE;
-	gpio_config( &gpio_conf );
-	ESP_LOGI( TAG, "Pulses GPIO configured!" );
-
-	/* se configuran las interrupciones y los handlers */
-	gpio_install_isr_service( 0 );
-	gpio_isr_handler_add( GPIO_PULSES, pulses_isr, ( void * )data_logger );
-
-	for( ;; )
-	{
-		/* se espera la notificación del isr de los pulsos */
-		event_to_process = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-
-		if( event_to_process != 0 )
-		{
-			/* se aumenta en 1 el conteo de pulsos, se guarda en la EEPROM y se almacena en la eeprom */
-			data_logger->pulses++;
-			at24cx_write16( data_logger->index, &data_logger->pulses );
-
-			ESP_LOGI( TAG, "[0x%X]=%d", data_logger->index, data_logger->pulses );
-			ds3231_get_time( &data_logger->rtc );
-			ESP_LOGI( TAG, "%02x/%02x/%02x,%02x:%02x:%02x", data_logger->rtc.date.date, data_logger->rtc.date.month, data_logger->rtc.date.year, data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
-		}
-	}
-}
-
-void data_loggger_alarm_task( void * arg )
-{
-	uint32_t event_to_process;
-	data_logger_t * data_logger = ( data_logger_t * )arg;
 
 	/* se configuran GPIOs */
 	ESP_LOGI( TAG, "Configuring pulses GPIO..." );
@@ -136,15 +94,56 @@ void data_loggger_alarm_task( void * arg )
 	gpio_config( &gpio_conf );
 	ESP_LOGI( TAG, "Alarm GPIO configured!" );
 
+
+	/* se configuran GPIOs */
+	ESP_LOGI( TAG, "Configuring pulses GPIO..." );
+	gpio_conf.pin_bit_mask = 1ULL << GPIO_PULSES;
+	gpio_conf.mode = GPIO_MODE_INPUT;
+	gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+	gpio_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+	gpio_conf.intr_type = GPIO_INTR_POSEDGE;
+	gpio_config( &gpio_conf );
+	ESP_LOGI( TAG, "Pulses GPIO configured!" );
+
 	/* se configuran las interrupciones y los handlers */
 	gpio_install_isr_service( 0 );
-	gpio_isr_handler_add( GPIO_ALARM, alarm_isr, ( void * )data_logger );
+	gpio_isr_handler_add( GPIO_PULSES, pulses_isr, ( void * )me );
+	gpio_isr_handler_add( GPIO_ALARM, alarm_isr, ( void * )me );
+}
+
+void data_loggger_pulses_task( void * arg )
+{
+	uint32_t event_to_process;
+	data_logger_t * data_logger = ( data_logger_t * )arg;
+
+	for( ;; )
+	{
+		/* se espera la notificación del isr de los pulsos */
+		event_to_process = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+
+		if( event_to_process != 0 )
+		{
+			/* se aumenta en 1 el conteo de pulsos, se guarda en la EEPROM y se almacena en la eeprom */
+			data_logger->pulses++;
+			eeprom_write16( data_logger->index, &data_logger->pulses );
+
+			ESP_LOGI( TAG, "[0x%X]=%d", data_logger->index, data_logger->pulses );
+			rtc_get_time( &data_logger->rtc );
+			ESP_LOGI( TAG, "%02x/%02x/%02x,%02x:%02x:%02x", data_logger->rtc.date.date, data_logger->rtc.date.month, data_logger->rtc.date.year, data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
+		}
+	}
+}
+
+void data_loggger_alarm_task( void * arg )
+{
+	uint32_t event_to_process;
+	data_logger_t * data_logger = ( data_logger_t * )arg;
 
 	/* se configura la frecuencia de la alarma */
 	set_data_frequency( data_logger );
 
 	/* se consulta si la alarma está activa y se notifica a la tarea encargada */
-	if( ds3231_get_alarm_flag( 1 ) )
+	if( rtc_get_alarm_flag( 1 ) )
 		xTaskNotifyGive( data_logger->alarm_handle );
 
 	for( ;; )
@@ -166,7 +165,7 @@ void data_loggger_alarm_task( void * arg )
 				xQueueSend( data_logger->queue, &data_logger->pulses, 0 );
 			}
 
-			ds3231_get_time( &data_logger->rtc );
+			rtc_get_time( &data_logger->rtc );
 			ESP_LOGI( TAG, "%02X:%02X",data_logger->rtc.time.hours, data_logger->rtc.time.minutes );
 			if( data_logger->rtc.time.hours == 0x00 && data_logger->rtc.time.minutes == 0x00 )	/* si la alarma se genera una vez al día */
 			{
@@ -175,23 +174,23 @@ void data_loggger_alarm_task( void * arg )
 				data_logger->index += DATA_SIZE;
 				if( data_logger->index > ( EEPROM_SIZE - DATA_SIZE ) )
 					data_logger->index = BASE_INDEX;
-				at24cx_write16( CURRENT_INDEX_ADDR, &data_logger->index );
+				eeprom_write16( CURRENT_INDEX_ADDR, &data_logger->index );
 
 				/* se pone en 0 el conteo diario de pulsos y se guarda en la memoria eeprom */
 				data_logger->pulses = 0;
-				at24cx_write16( data_logger->index, &data_logger->pulses );
+				eeprom_write16( data_logger->index, &data_logger->pulses );
 
 				/* se obtiene la nueva fecha y se guarda en la eeprom*/
-				ds3231_get_date( &data_logger->rtc );
-				at24cx_write8( data_logger->index + 2, &data_logger->rtc.date.date );
-				at24cx_write8( data_logger->index + 3, &data_logger->rtc.date.month );
-				at24cx_write8( data_logger->index + 4, &data_logger->rtc.date.year );
+				rtc_get_date( &data_logger->rtc );
+				eeprom_write8( data_logger->index + 2, &data_logger->rtc.date.date );
+				eeprom_write8( data_logger->index + 3, &data_logger->rtc.date.month );
+				eeprom_write8( data_logger->index + 4, &data_logger->rtc.date.year );
 
 				/* se aumenta en 1 el conteo total de dias monitoreados y se guarda en la eeprom */
 				if( data_logger->logged_days < MAX_LOGGED_DAYS ) //!!!
 				{
 					data_logger->logged_days++;
-					at24cx_write16( TOTAL_LOGGED_DAYS_ADDR, &data_logger->logged_days );
+					eeprom_write16( TOTAL_LOGGED_DAYS_ADDR, &data_logger->logged_days );
 				}
 			}
 
@@ -200,7 +199,7 @@ void data_loggger_alarm_task( void * arg )
 
 			/* se borra el flag de la alarma */
 			ESP_LOGI( TAG, "clear flag!" );
-			ds3231_clear_alarm_flag( 1 );
+			rtc_clear_alarm_flag( 1 );
 		}
 	}
 }
@@ -223,11 +222,11 @@ void data_logger_get_csv( data_logger_t * const me )
 		fprintf( f, "date,kwh\n" );
 		for( uint16_t i = BASE_INDEX; i < BASE_INDEX + ( me->logged_days * DATA_SIZE ) + 1; i += DATA_SIZE )
 		{
-			at24cx_read16( i, &pulses );
+			eeprom_read16( i, &pulses );
 			kwh = ( float )pulses * me->settings.pulses_to_kwh;
-			at24cx_read8( i + 2, &date );
-			at24cx_read8( i + 3, &month );
-			at24cx_read8( i + 4, &year );
+			eeprom_read8( i + 2, &date );
+			eeprom_read8( i + 3, &month );
+			eeprom_read8( i + 4, &year );
 			ESP_LOGI( TAG, " E[%03X] | %02x-%02x-%02x | %06.2f", i, date, month, year, kwh );
 			fprintf( f, "20%02x-%02x-01,%06.2f\n", year, month, kwh );
 		}
@@ -307,9 +306,9 @@ static void set_data_frequency( data_logger_t * const me )
 			break;
 	}
 
-	ds3231_set_alarm( &me->rtc, ALARM1 );
+	rtc_set_alarm( &me->rtc, ALARM1 );
 	me->rtc.alarm_interrupt_mode = ENABLE_ALARM1;
-	ds3231_set_alarm_interrupt( &me->rtc );
+	rtc_set_alarm_interrupt( &me->rtc );
 }
 
 

@@ -21,10 +21,8 @@
 #include "esp_log.h"
 
 #include "driver/gpio.h"
-
-#include "i2c_conf.h"
-#include "at24cx.h"
-#include "ds3231.h"
+#include "eeprom.h"
+#include "rtc.h"
 #include "spiffs.h"
 /*==================[cplusplus]==============================================*/
 
@@ -45,7 +43,7 @@ extern "C" {
 
 typedef struct
 {
-	ds3231_t rtc;				/*!< rtc data */
+	rtc_t rtc;				/*!< rtc data */
 	uint16_t pulses;			/*!< daily counted pulses */
 	uint16_t logged_days;		/*!< quantity of logged days */
 	uint16_t index;				/*!< eeprom index */
