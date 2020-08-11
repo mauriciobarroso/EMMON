@@ -48,7 +48,7 @@ typedef struct
 
 bool data_transmission_init( data_transmission_t * const me );
 
-void send_to_gateway( void * arg );	/* cambiar nombre! */
+void lora_task( void * arg );	/* cambiar nombre! */
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus

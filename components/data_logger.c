@@ -53,10 +53,19 @@ void data_logger_init( data_logger_t * const me )
 	/* se inicializa eeprom */
 	eeprom_init();
 
-	me->rtc.time.hours = 0x23;
-	me->rtc.time.minutes = 0x59;
-	me->rtc.time.seconds = 0x58;
-	rtc_set_time( &me->rtc );
+//	me->rtc.time.hours = 0x18;
+//	me->rtc.time.minutes = 0x27;
+//	me->rtc.time.seconds = 0x00;
+//	rtc_set_time( &me->rtc );
+//
+//	me->rtc.date.date = 0x10;
+//	me->rtc.date.month = 0x8;
+//	me->rtc.date.year = 0x20;
+//	rtc_set_date( &me->rtc );
+
+//	uint8_t data = 0;
+//	for( uint8_t i = 0x0; i <= 0x20; i++ )
+//		eeprom_write8(i, &data);
 
 	/* se inicializa la variable para el índice de conteo de pulsos */
 	eeprom_read16( CURRENT_INDEX_ADDR, &me->index );
@@ -123,6 +132,13 @@ void data_loggger_pulses_task( void * arg )
 
 		if( event_to_process != 0 )
 		{
+//			ESP_LOGI( TAG, "current:%u", current_time );
+			ESP_LOGI( TAG, "---------------------------");
+			ESP_LOGI( TAG, "elapsed:%u", elapsed_time );
+			elapsed_time = 0;
+			gpio_set_intr_type( GPIO_PULSES, GPIO_INTR_POSEDGE );
+			edge_status = 0;
+
 			/* se aumenta en 1 el conteo de pulsos, se guarda en la EEPROM y se almacena en la eeprom */
 			data_logger->pulses++;
 			eeprom_write16( data_logger->index, &data_logger->pulses );
@@ -130,6 +146,7 @@ void data_loggger_pulses_task( void * arg )
 			ESP_LOGI( TAG, "[0x%X]=%d", data_logger->index, data_logger->pulses );
 			rtc_get_time( &data_logger->rtc );
 			ESP_LOGI( TAG, "%02x/%02x/%02x,%02x:%02x:%02x", data_logger->rtc.date.date, data_logger->rtc.date.month, data_logger->rtc.date.year, data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
+			ESP_LOGI( TAG, "---------------------------");
 		}
 	}
 }
@@ -252,15 +269,17 @@ static void IRAM_ATTR pulses_isr( void *arg )
 	else	/* flanco negativo */
 	{
 		elapsed_time = xTaskGetTickCountFromISR() - current_time;
-		gpio_set_intr_type( GPIO_PULSES, GPIO_INTR_POSEDGE );
-		edge_status = 0;
+//		gpio_set_intr_type( GPIO_PULSES, GPIO_INTR_POSEDGE );
+//		edge_status = 0;
 	}
 
 	if( elapsed_time >= 10 )
 	{
-		elapsed_time = 0;
+//		elapsed_time = 0;
 		vTaskNotifyGiveFromISR( data_logger->pulses_handle, &higher_priority_task_woken );
 		portEND_SWITCHING_ISR( higher_priority_task_woken );
+//		gpio_set_intr_type( GPIO_PULSES, GPIO_INTR_POSEDGE );
+//		edge_status = 0;
 	}
 }
 

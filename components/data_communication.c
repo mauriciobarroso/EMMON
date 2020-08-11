@@ -37,6 +37,11 @@ bool data_transmission_init( data_transmission_t * const me )
 		return 0;
 	}
 	ESP_LOGI( TAG, "lora frequency 433 MHz" );
+
+//	lora_set_signal_bandwidth( 41.7E3 );
+//	lora_set_spreading_factor( 12 );
+//	lora_set_coding_rate4( 5 );
+
 	ESP_LOGI( TAG, "Configured lora!" );
 
 	/* se crea la cola */
@@ -51,7 +56,7 @@ bool data_transmission_init( data_transmission_t * const me )
 	return 1;
 }
 
-void send_to_gateway( void * arg )	/* cambiar nombre! */
+void lora_task( void * arg )	/* cambiar nombre! */
 {
 	data_transmission_t * data_transmission = ( data_transmission_t * )arg;
 	char buf[ MAX_PACKET_LEN ];
@@ -66,7 +71,7 @@ void send_to_gateway( void * arg )	/* cambiar nombre! */
 			if( xQueueReceive( data_transmission->queue, &pulses, portMAX_DELAY ) == pdTRUE )	/*revisar!*/
 			{
 				/* send to LoRa gateway REVISAR!!! */
-				sprintf( buf, "%06.2f,%010X", pulses * 0.000625, HOST_ADDR );	/* se arma el paquete a transmitir */
+				sprintf( buf, "%08X,1,%06.2f", HOST_ADDR, pulses * 0.000625 );	/* se arma el paquete a transmitir */
 
 				lora_disable_invert_iq();
 				lora_send_packet( buf, strlen( buf ) );
@@ -99,49 +104,38 @@ void send_to_gateway( void * arg )	/* cambiar nombre! */
 
 static void actions( char * buf )
 {
-	int who, me, action;
-	char param[ 32 ];
+	int address, operation;
+	char data[ 32 ];
 
-	sscanf( buf, "%u,%u,%u,%s", &who, &me, &action, param );
+	sscanf( buf, "%u,%u,%s", &address, &operation, data );
 
-	if( ( who == 0x0 ) && ( me == HOST_ADDR || me == BROADCAST_ADDR ) )
+	ESP_LOGI( TAG, "address=%u", address );
+	ESP_LOGI( TAG, "operation=%u", operation );
+	ESP_LOGI( TAG, "data=%s", data );
+
+	if( address == 12345678 || address == BROADCAST_ADDR )
 	{
-		switch( action )
+		ESP_LOGI( TAG, "address ok!" );
+		switch( operation )
 		{
 			/* cambio de fc_kwh y fc_price */
 			case 0x1:
 			{
-				float kwh, price;	/* cambiar por una variables global */
-				sscanf( param, "%f,%f", &kwh, &price );
-
-				FILE * f = NULL;
-
-				f = fopen( "spiffs/params_data.txt", "w" );
-				if( f != 0 )
-				{
-					fprintf( f, "%f&%f", kwh, price );
-					fclose( f );
-				}
-
-				break;
-			}
-
-			/* notificaciones */
-			case 0x2:
-			{
-				FILE * f = NULL;
-
-				f = fopen( "spiffs/notifications_data.txt", "w" );
-				if( f != 0 )
-				{
-					fprintf( f, "%s", param );
-					fclose( f );
-				}
-
+				ESP_LOGI( TAG, "operation 1" );
+//
+//				FILE * f = NULL;
+//
+//				f = fopen( "spiffs/params_data.txt", "w" );
+//				if( f != 0 )
+//				{
+//					fprintf( f, "%f&%f", kwh, price );
+//					fclose( f );
+//				}
 				break;
 			}
 
 			default:
+				ESP_LOGI( TAG, "default, error" );
 				break;
 		}
 	}

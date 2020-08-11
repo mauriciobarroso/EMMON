@@ -58,7 +58,7 @@ void app_main ()
 	ESP_LOGI( TAG, "Tasks created!" );
 //
 	/* se crea la tarea de data_transmission */
-	xTaskCreate( send_to_gateway, "Send to gateway Task", configMINIMAL_STACK_SIZE * 2, ( void * )&data_transmission, tskIDLE_PRIORITY + 1, NULL );
+	xTaskCreate( lora_task, "Send to gateway Task", configMINIMAL_STACK_SIZE * 2, ( void * )&data_transmission, tskIDLE_PRIORITY + 1, NULL );
 	ESP_LOGI( TAG, "Created task!" );
 }
 
