@@ -27,7 +27,7 @@
 /*==================[data declaration]================================================*/
 
 /* tag for debug */
-static const char * TAG = "emmon";
+//static const char * TAG = "emmon";
 
 /* data for modules */
 data_logger_t data_logger;				/*!< user id */
@@ -51,15 +51,6 @@ void app_main ()
 	data_transmission_init( &data_transmission );
 
 	data_logger.queue = data_transmission.queue;
-
-	/* se crean las tareas de data_logger */
-	xTaskCreate( data_loggger_pulses_task, "Pulses Task", configMINIMAL_STACK_SIZE * 2, ( void * )&data_logger, tskIDLE_PRIORITY + 3, &data_logger.pulses_handle );	/* tarea para el conteo de pulsos */
-	xTaskCreate( data_loggger_alarm_task, "Alarm Task", configMINIMAL_STACK_SIZE * 2, ( void * )&data_logger, tskIDLE_PRIORITY + 2, &data_logger.alarm_handle );		/* tarea para ejecutar las acciones cuadno ocurre la alarma */
-	ESP_LOGI( TAG, "Tasks created!" );
-//
-	/* se crea la tarea de data_transmission */
-	xTaskCreate( lora_task, "Send to gateway Task", configMINIMAL_STACK_SIZE * 2, ( void * )&data_transmission, tskIDLE_PRIORITY + 1, NULL );
-	ESP_LOGI( TAG, "Created task!" );
 }
 
 /*==================[function definition ]================================================*/

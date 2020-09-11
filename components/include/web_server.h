@@ -33,6 +33,8 @@
 #include "esp_http_server.h"
 #include "spiffs.h"
 
+#include "data_logger.h"
+
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
@@ -56,15 +58,9 @@ extern "C" {
 
 typedef struct
 {
-	char wifi_sta[ 32 ];
-	char wifi_ap[ 32 ];
-} wifi_t;
-
-typedef struct
-{
-	uint16_t port;
-	uint16_t max_uri_handlers;
+	httpd_handle_t server;
 	spiffs_t settings;
+	data_logger_t * data_logger;
 } web_server_t;
 
 /*==================[external data declaration]==============================*/

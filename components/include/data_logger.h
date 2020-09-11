@@ -66,16 +66,6 @@ void data_logger_init( data_logger_t * const me );
 /**
  * @brief Data Logger initialization
  */
-void data_loggger_pulses_task( void * arg );
-
-/**
- * @brief Data Logger initialization
- */
-void data_loggger_alarm_task( void * arg );
-
-/**
- * @brief Data Logger initialization
- */
 void data_logger_get_csv( data_logger_t * const me );
 
 /*==================[cplusplus]==============================================*/

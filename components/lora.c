@@ -600,12 +600,9 @@ void lora_send_packet( char * buf, int size )
 
 	/* start transmission and wait for conclusion */
 	write_reg( REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX );
-	ESP_LOGI( TAG, "OK1");
 	while( ( read_reg( REG_IRQ_FLAGS ) & IRQ_TX_DONE_MASK ) == 0 )
 		vTaskDelay( 2 );
-	ESP_LOGI( TAG, "OK2");
 	write_reg( REG_IRQ_FLAGS, IRQ_TX_DONE_MASK );
-	ESP_LOGI( TAG, "OK3");
 }
 
 int lora_receive_packet( char * buf, int size )

@@ -23,6 +23,7 @@ static const char * TAG = "data_communication";
 
 /*==================[internal functions declaration]=========================*/
 
+static void lora_task( void * arg );
 static void actions( char * buf );
 
 /*==================[external functions definition]=========================*/
@@ -53,10 +54,17 @@ bool data_transmission_init( data_transmission_t * const me )
 	}
 	ESP_LOGI( TAG, "Created queue!" );
 
+	/* se crea la tarea de data_transmission */
+	xTaskCreate( lora_task, "LoRa Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 1, NULL );
+	ESP_LOGI( TAG, "Created task!" );
+
 	return 1;
 }
 
-void lora_task( void * arg )	/* cambiar nombre! */
+/*==================[internal functions definition]==========================*/
+
+/* send/receive LoRa task */
+static void lora_task( void * arg )
 {
 	data_transmission_t * data_transmission = ( data_transmission_t * )arg;
 	char buf[ MAX_PACKET_LEN ];
@@ -66,17 +74,17 @@ void lora_task( void * arg )	/* cambiar nombre! */
 	{
 		while( uxQueueMessagesWaiting( data_transmission->queue ) != 0 )
 		{
-			ESP_LOGI( TAG, "ENTRO!" );
 			/* se bloquea esperando paquetes a transmitir */
 			if( xQueueReceive( data_transmission->queue, &pulses, portMAX_DELAY ) == pdTRUE )	/*revisar!*/
 			{
 				/* send to LoRa gateway REVISAR!!! */
-				sprintf( buf, "%08X,1,%06.2f", HOST_ADDR, pulses * 0.000625 );	/* se arma el paquete a transmitir */
-
+				sprintf( buf, "%08u,0,%06.2f", data_transmission->settings.id, pulses * data_transmission->settings.pulses_to_kwh );	/* se arma el paquete a transmitir */
+				ESP_LOGI( TAG, "sending %08u0%06.2f,", data_transmission->settings.id, pulses * data_transmission->settings.pulses_to_kwh );
 				lora_disable_invert_iq();
+				vPortEnterCritical();					/* se cierra sección crítica */
 				lora_send_packet( buf, strlen( buf ) );
-
-				ESP_LOGI( TAG, buf );	/* se imprime por consola el paquete a enviar */
+				vPortExitCritical();					/* se cierra sección crítica */
+				ESP_LOGI( TAG, "packet sent!" );
 			}
 		}
 
@@ -88,20 +96,18 @@ void lora_task( void * arg )	/* cambiar nombre! */
 			len = lora_receive_packet( buf, sizeof( buf ) );
 			buf[ len ] = '\0';
 
-			ESP_LOGI( TAG, buf );
-			ESP_LOGI( TAG, "RSSI: %d", lora_packet_rssi() );
+//			ESP_LOGI( TAG, buf );
+//			ESP_LOGI( TAG, "RSSI: %d", lora_packet_rssi() );
 
 			/* se ejecutan las acciones requeridas por el gateway */
-			actions( buf );
+//			actions( buf );
 		}
 
 		vTaskDelay( pdMS_TO_TICKS( 500 ) );
 	}
 }
 
-
-/*==================[internal functions definition]==========================*/
-
+/* settings modify function */
 static void actions( char * buf )
 {
 	int address, operation;

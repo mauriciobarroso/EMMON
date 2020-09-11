@@ -86,8 +86,14 @@ void spiffs_get_settings( spiffs_t * const me )
 				}
 				case 2:
 				{
+					sscanf( line, "%d", &me->id );
+					ESP_LOGI( TAG, "id=%d", me->id );
+					break;
+				}
+				case 3:
+				{
 					sscanf( line, "%s", me->wifi_data );
-					ESP_LOGI( TAG, "wifi_data=%s", me->wifi_data );
+					ESP_LOGI( TAG, "sta=%s", me->wifi_data );
 					break;
 				}
 				default:
@@ -98,6 +104,17 @@ void spiffs_get_settings( spiffs_t * const me )
 			}
 		}
 
+		fclose( f );
+	}
+}
+
+void spiffs_set_settings( spiffs_t * const me )
+{
+	FILE * f = NULL;
+	f = fopen( "/spiffs/config.txt", "w" );
+	if( f != 0 )
+	{
+		fprintf( f, "%d\n%f\n%d\n%s\n", me->frequency, me->pulses_to_kwh, me->id, me->wifi_data );
 		fclose( f );
 	}
 }

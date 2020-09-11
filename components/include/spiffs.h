@@ -44,6 +44,8 @@ esp_err_t spiffs_init( void );
 
 void spiffs_get_settings( spiffs_t * const me );
 
+void spiffs_set_settings( spiffs_t * const me );
+
 /*==================[cplusplus]==============================================*/
 
 #ifdef __cplusplus
