@@ -1,25 +1,25 @@
 /*
- * data_transmission.h
+ * control.h
  *
- * Created on: Nov 1, 2019
- * Author: Mauricio Barroso
+ * Created on: Sep 11, 2020
+ * Author: Mauricio Barroso Benavides
  */
 
-#ifndef _DATATRANSMISSION_H_
-#define _DATATRANSMISSION_H_
+#ifndef _CONTROL_H_
+#define _CONTROL_H_
 
 /*==================[inclusions]=============================================*/
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <math.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "lora.h"
-#include "queue.h"
 
-#include "spiffs.h"
+#include "data_logger.h"
+#include "web_server.h"
+#include "data_communication.h"
 
 /*==================[cplusplus]==============================================*/
 
@@ -29,24 +29,20 @@ extern "C" {
 
 /*==================[macros]=================================================*/
 
-#define QUEUE_LENGTH	4
-#define GATEWAY_ADDR	0x0
-#define HOST_ADDR		0x12345678
-#define BROADCAST_ADDR	0xFFFFFFFF
+/* debug mode */
+#define DEBUG_MESSAGES
+
+/* definicion de pines de interrupcion */
+#define GPIO_PULSES	4	/*!< pulses interrupt pin */
+#define GPIO_ALARM	5	/*!< alarm interrupt pin */
 
 /*==================[typedef]================================================*/
-
-typedef struct
-{
-	QueueHandle_t queue;		/*!< packet receive queue */
-	spiffs_t settings;			/*!< data from settings.txt */
-} data_transmission_t;
 
 /*==================[external data declaration]==============================*/
 
 /*==================[external functions declaration]=========================*/
 
-esp_err_t data_transmission_init( data_transmission_t * const me );
+void control_get_csv( data_logger_t * const me );
 
 /*==================[cplusplus]==============================================*/
 
@@ -57,4 +53,4 @@ esp_err_t data_transmission_init( data_transmission_t * const me );
 /** @} doxygen end group definition */
 /*==================[end of file]============================================*/
 
-#endif /* #ifndef _DATATRANSMISSION_H_ */
+#endif /* #ifndef _CONTROL_H_ */

@@ -11,8 +11,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <sys/unistd.h>
-#include <sys/stat.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

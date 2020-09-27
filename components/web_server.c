@@ -49,7 +49,6 @@ static const char * get_path_from_uri( char* dest, const char* base_path, const 
 
 /* uri handlers */
 static esp_err_t set_wifi_data( httpd_req_t * req );
-static esp_err_t get_pulses_data( httpd_req_t * req );
 
 /* wifi connect funcion */
 static void wifi_connect( char * buf );
@@ -243,83 +242,50 @@ static void register_uri_handlers( web_server_t * const me )
     /* URI handler for web interface */
 	httpd_uri_t uri_handler;
 
+	uri_handler.method    = HTTP_GET;
+	uri_handler.handler   = download_get_handler;
+	uri_handler.user_ctx  = scratch;
+
 	uri_handler.uri = "/index.html";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-    /* URI handler for web interface */
+    /* URI handler to download favicon.ico */
 	uri_handler.uri = "/favicon.ico";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-    /* URI handler for web interface */
+    /* URI handler to download jquerymobilecss.css */
 	uri_handler.uri = "/jquerymobilecss.css";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler to download jqueryjs.js */
 	uri_handler.uri = "/jqueryjs.js";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler to download jquerymobilejs.js */
 	uri_handler.uri = "/jquerymobilejs.js";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler to download jquerymobilemap.map */
 	uri_handler.uri = "/jquerymobilemap.map";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler to download highchartsjs.js */
 	uri_handler.uri = "/highchartsjs.js";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler for download highchartsmap.map */
 	uri_handler.uri = "/highchartsmap.map";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
+	/* URI handler to download ajax-loadergif.gif */
 	uri_handler.uri = "/ajax-loadergif.gif";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-    /* URI handler for web interface */
+    /* URI handler to download kwh.csv */
 	uri_handler.uri = "/kwh.csv";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = get_pulses_data;
-	uri_handler.user_ctx  = scratch;
 	httpd_register_uri_handler( &me->server, &uri_handler );
 
-	/* URI handler for web interface */
-	uri_handler.uri = "/config.txt";
-	uri_handler.method    = HTTP_GET;
-	uri_handler.handler   = download_get_handler;
-	uri_handler.user_ctx  = scratch;
-	httpd_register_uri_handler( &me->server, &uri_handler );
-
-	/* URI handler for web interface */
+	/* URI handler to change wifi settings */
 	uri_handler.uri = "/wifi_data";
 	uri_handler.method    = HTTP_POST;
 	uri_handler.handler   = set_wifi_data;
@@ -542,15 +508,6 @@ static esp_err_t set_wifi_data( httpd_req_t * req )
     }
 
     return ESP_OK;
-}
-
-static esp_err_t get_pulses_data( httpd_req_t * req )
-{
-
-
-	download_get_handler( req );
-
-	return ESP_OK;
 }
 
 /*==================[end of file]============================================*/

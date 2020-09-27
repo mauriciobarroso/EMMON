@@ -13,10 +13,10 @@
 
 /* addresses */
 #define CURRENT_INDEX_ADDR			0x4	/*!< dirección en la eeprom donde se guarda la fecha */
-#define	TOTAL_LOGGED_DAYS_ADDR		0x2	/*!< dirección en la eeprom donde se guarda la cantidad de dias monitoreados */
+#define	TOTAL_LOGGED_DAYS_ADDR		0x6	/*!< dirección en la eeprom donde se guarda la cantidad de dias monitoreados */
 
 /* values */
-#define BASE_INDEX					0x10	/*!< índice base para el almacenamiento de pulsos (cambiar por EEPROM_OFFSET */
+#define BASE_INDEX					0x30	/*!< índice base para el almacenamiento de pulsos (cambiar por EEPROM_OFFSET */
 #define DATA_SIZE					5		/*!< tamaño en bytes de los datos guardados(pulsos diarios y fecha) en la EEPROM */
 
 /**/
@@ -29,6 +29,7 @@
 /* tag for debug */
 static const char * TAG = "data_logger";
 
+/* variables for the pulses filter */
 static uint8_t edge_status = 0;
 static TickType_t current_time = 0;
 static TickType_t elapsed_time = 0;
@@ -52,41 +53,50 @@ static void set_data_frequency( data_logger_t * const me );
 
 void data_logger_init( data_logger_t * const me )
 {
-	/* se inicializa rtc */
-
 	/* se inicializa eeprom */
 	eeprom_init();
 
 //	uint8_t data = 0;
-//	for( uint8_t i = 0x0; i <= 0x5F; i++ )
+//	for( uint8_t i = 0x0; i <= 0x7F; i++ )
 //		eeprom_write8(i, &data);
-
-//	me->rtc.date.date = 0x11;
+//
+//	me->rtc.date.date = 0x12;
 //	me->rtc.date.month = 0x9;
 //	me->rtc.date.year = 0x20;
 //	rtc_set_date( &me->rtc );
 
-//	me->rtc.time.hours = 0x12;
-//	me->rtc.time.minutes = 0x39;
-//	me->rtc.time.seconds = 0x10;
+//	me->rtc.time.hours = 0x20;
+//	me->rtc.time.minutes = 0x54;
+//	me->rtc.time.seconds = 0x50;
 //	rtc_set_time( &me->rtc );
 
 	/* se inicializa la variable para el índice de conteo de pulsos */
 	eeprom_read16( CURRENT_INDEX_ADDR, &me->index );
 	if( me->index < BASE_INDEX || me->index == 0xFFFF )
+	{
 		me->index = BASE_INDEX;
+		eeprom_write16( BASE_INDEX, &me->index );
+	}
 	ESP_LOGI( TAG, "index:0x%X", me->index );
 
 	/* se inicializa la variable para el conteo de pulsos */
 	eeprom_read16( me->index, &me->pulses );
 	if( me->pulses == 0xFFFF )
+	{
 		me->pulses = 0;
+		eeprom_write16( me->index, &me->pulses );
+	}
+//	me->pulses = 15856;
+//	eeprom_write16( me->index, &me->pulses );
 	ESP_LOGI( TAG, "pulses:%d", me->pulses );
 
 	/* se inicializa la variable para el conteo total de días monitoreados */
 	eeprom_read16( TOTAL_LOGGED_DAYS_ADDR, &me->logged_days );
 	if( me->logged_days == 0xFFFF )
+	{
 		me->logged_days = 0;
+		eeprom_write16( TOTAL_LOGGED_DAYS_ADDR, &me->logged_days );
+	}
 	ESP_LOGI( TAG, "logged_days:%d", me->logged_days );
 
 	/* se obtiene la fecha del rtc y se almacena en la eeprom */
@@ -107,7 +117,6 @@ void data_logger_init( data_logger_t * const me )
 	gpio_config( &gpio_conf );
 	ESP_LOGI( TAG, "Alarm GPIO configured!" );
 
-
 	/* se configuran GPIOs */
 	ESP_LOGI( TAG, "Configuring pulses GPIO..." );
 	gpio_conf.pin_bit_mask = 1ULL << GPIO_PULSES;
@@ -127,6 +136,9 @@ void data_logger_init( data_logger_t * const me )
 	xTaskCreate( pulses_task, "Pulses Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 3, &me->pulses_handle );	/* tarea para el conteo de pulsos */
 	xTaskCreate( alarm_task, "Alarm Task", configMINIMAL_STACK_SIZE * 2, ( void * )me, tskIDLE_PRIORITY + 2, &me->alarm_handle );		/* tarea para ejecutar las acciones cuadno ocurre la alarma */
 	ESP_LOGI( TAG, "Tasks created!" );
+
+	/* se genera el archivo csv */
+	data_logger_get_csv( me );
 }
 
 void data_logger_get_csv( data_logger_t * const me )
@@ -138,7 +150,6 @@ void data_logger_get_csv( data_logger_t * const me )
 	if( f != 0 )
 	{
 		uint16_t pulses;
-		float kwh;
 		uint8_t date, month, year;
 
 //		ESP_LOGI( TAG, "===============================" );
@@ -147,10 +158,7 @@ void data_logger_get_csv( data_logger_t * const me )
 		fprintf( f, "date,kwh\n" );
 		for( uint16_t i = BASE_INDEX; i < BASE_INDEX + ( me->logged_days * DATA_SIZE ) + 1; i += DATA_SIZE )
 		{
-//			uint8_t i = BASE_INDEX + ( me->logged_days * DATA_SIZE );
-
 			eeprom_read16( i, &pulses );
-			kwh = pulses * me->settings.pulses_to_kwh;
 			eeprom_read8( i + 2, &date );
 			eeprom_read8( i + 3, &month );
 			eeprom_read8( i + 4, &year );
@@ -212,15 +220,18 @@ static void pulses_task( void * arg )
 
 		if( event_to_process != 0 )
 		{
-			ESP_LOGI( TAG, "---------------------------");
 			/* se abre sección crítica */
 			taskENTER_CRITICAL();
+
 			/* se aumenta en 1 el conteo de pulsos, se guarda en la EEPROM y se almacena en la eeprom */
 			data_logger->pulses++;
 			eeprom_write16( data_logger->index, &data_logger->pulses );
+
 			/* se cierra sección crítica */
 			taskEXIT_CRITICAL();
 
+			/* se imprime el acumulador de pulsos junto con la fecha y hora */
+			ESP_LOGI( TAG, "---------------------------");
 			ESP_LOGI( TAG, "[0x%X]=%d", data_logger->index, data_logger->pulses );
 			rtc_get_time( &data_logger->rtc );
 			ESP_LOGI( TAG, "%02x/%02x/%02x,%02x:%02x:%02x", data_logger->rtc.date.date, data_logger->rtc.date.month, data_logger->rtc.date.year, data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
@@ -251,21 +262,25 @@ void alarm_task( void * arg )
 		{
 			ESP_LOGI( TAG, "Alarm!" );
 
+			/* se obtiene e imprime la hora a la que ocurre la alarma */
+			rtc_get_time( &data_logger->rtc );
+			ESP_LOGI( TAG, "%02X:%02X:%02X",data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
+
 			/* se abre sección crítica */
 			taskENTER_CRITICAL();
 
-			/* se constuye el paquete y se manda  a la cola de Data Transmission */
-			if( data_logger->queue != 0 )
+			/* se manda el acumulador de pulsos por la cola */
+			if( data_logger->queue != NULL )
 			{
-				ESP_LOGI( TAG, "sending %d to queue", data_logger->pulses );
+				ESP_LOGI( TAG, "Sending %d to queue", data_logger->pulses );
 				xQueueSend( data_logger->queue, &data_logger->pulses, 0 );
 			}
 
-			rtc_get_time( &data_logger->rtc );
-			ESP_LOGI( TAG, "%02X:%02X:%02X",data_logger->rtc.time.hours, data_logger->rtc.time.minutes, data_logger->rtc.time.seconds );
-			if( data_logger->rtc.time.hours == 0x0 && data_logger->rtc.time.minutes == 0x0 && data_logger->rtc.time.seconds == 0x0 )	/* si la alarma se genera una vez al día */
+			/* se consulta si es un día nuevo */
+			if( data_logger->rtc.time.hours == 0x0 && data_logger->rtc.time.minutes == 0x0 && data_logger->rtc.time.seconds == 0x0 )
 			{
 				ESP_LOGI( TAG, "new day!" );
+
 				/* se aumenta el indice en DATA_SIZE y se guarda en la eeprom */
 				data_logger->index += DATA_SIZE;
 				if( data_logger->index > ( EEPROM_SIZE - DATA_SIZE ) )
@@ -283,12 +298,13 @@ void alarm_task( void * arg )
 				eeprom_write8( data_logger->index + 4, &data_logger->rtc.date.year );
 
 				/* se aumenta en 1 el conteo total de dias monitoreados y se guarda en la eeprom */
-				if( data_logger->logged_days < MAX_LOGGED_DAYS ) //!!!
+				if( data_logger->logged_days < MAX_LOGGED_DAYS )
 				{
 					data_logger->logged_days++;
 					eeprom_write16( TOTAL_LOGGED_DAYS_ADDR, &data_logger->logged_days );
 				}
 			}
+
 			/* se cierra sección crítica */
 			taskEXIT_CRITICAL();
 
@@ -301,7 +317,7 @@ void alarm_task( void * arg )
 	}
 }
 
-/* send data frequency function */
+/* RTC alarm configuration function */
 static void set_data_frequency( data_logger_t * const me )
 {
 	me->rtc.alarm1.seconds = 0x0;
@@ -309,26 +325,23 @@ static void set_data_frequency( data_logger_t * const me )
 	me->rtc.alarm1.hours = 0x0;
 	me->rtc.alarm1.daydate = 0x0;
 
-	/* set alarm */
+	/* se configura la alarma 1 del RTC con los valores obtenidos
+	 * de config.txt */
 	switch( me->settings.frequency )
 	{
 		case 1:
-			/* se configura la alarma 1 del RTC */
 			me->rtc.alarm1.mode = SECONDS_MATCH;
 			ESP_LOGI( TAG, "Alarm configured once per minute!" );
 			break;
 		case 2:
-			/* se configura la alarma 1 del RTC */
 			me->rtc.alarm1.mode = MINUTES_SECONDS_MATCH;
 			ESP_LOGI( TAG, "Alarm configured once per hour!" );
 			break;
 		case 3:
-			/* se configura la alarma 1 del RTC */
 			me->rtc.alarm1.mode = HOURS_MINUTES_SECONDS_MATCH;
 			ESP_LOGI( TAG, "Alarm configured once per day!" );
 			break;
 		default:
-			/* se configura la alarma 1 del RTC */
 			me->rtc.alarm1.mode = HOURS_MINUTES_SECONDS_MATCH;
 			ESP_LOGI( TAG, "Alarm configured once per day!" );
 			break;
